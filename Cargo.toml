@@ -1,0 +1,7 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+name = "mathbench"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
