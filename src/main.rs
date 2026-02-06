@@ -13,9 +13,7 @@ fn main() {
     // 桁数 * log2(10) + 10(誤差補正用)
     let precision = (digits as f64 * 10.0_f64.log2() + 10.0) as usize;
 
-    let start = Instant::now();
-    let _ = calculate_pi(precision);
-    let duration = start.elapsed();
+    let (_, duration) = calculate_pi(precision);
 
     println!("Calculated {} digits of pi in {:?}", digits, duration);
 }
