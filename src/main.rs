@@ -5,6 +5,8 @@ use std::io::Write;
 use std::time::Duration;
 use std::time::Instant;
 
+type BigFloat = FBig<HalfEven, 10>;
+
 fn main() {
     // 計算する桁数
     let digits = 1_040_000;
@@ -35,16 +37,12 @@ fn main() {
 /// Gauss-Legendre法で円周率を計算する関数
 /// https://qiita.com/matsuda_tkm/items/418588d3c59cc8d85ec7
 /// https://ja.wikipedia.org/wiki/ガウス＝ルジャンドルのアルゴリズム
-fn gauss_legendre_algorithm(precision: usize, iterations: usize) -> (FBig<HalfEven, 10>, Duration) {
+fn gauss_legendre_algorithm(precision: usize, iterations: usize) -> (BigFloat, Duration) {
     let start = Instant::now();
     // 初期値を設定
-    let one = FBig::<HalfEven, 10>::ONE.with_precision(precision).unwrap();
-    let two = FBig::<HalfEven, 10>::from(2u8)
-        .with_precision(precision)
-        .unwrap();
-    let four = FBig::<HalfEven, 10>::from(4u8)
-        .with_precision(precision)
-        .unwrap();
+    let one = BigFloat::ONE.with_precision(precision).unwrap();
+    let two = BigFloat::from(2u8).with_precision(precision).unwrap();
+    let four = BigFloat::from(4u8).with_precision(precision).unwrap();
 
     let mut a = one.clone();
     let mut b = (&one / &two.sqrt()).with_precision(precision).unwrap();
