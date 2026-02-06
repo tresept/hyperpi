@@ -1,70 +1,88 @@
 use dashu::base::SquareRoot;
 use dashu::float::{FBig, round::mode::HalfEven};
+use std::fs;
+use std::io::Write;
+use std::time::Duration;
 use std::time::Instant;
 
 fn main() {
     // 計算する桁数
-    let digits = 0;
+    let digits = 1_040_000;
 
     // 必要なビット精度を計算
-    // 桁数 * log2(10) + 10(誤差補正用)
-    let precision = (digits as f64 * 10.0_f64.log2() + 10.0) as usize;
+    // 桁数 + 100(誤差補正用)
+    let precision = digits + 100;
 
-    let start = Instant::now();
-    let _ = calculate_pi(precision);
-    let duration = start.elapsed();
+    // 必要なループ回数を計算
+    // Gauss-Legendre法は2次収束なので、だいたい log2(precision) 回繰り返せば十分
+    let iterations = ((precision as f64).log2().ceil() as usize).max(10);
 
-    println!("Calculated {} digits of pi in {:?}", digits, duration);
+    println!("{}桁の計算開始．{}回のループとなります", digits, iterations);
+    let (pi, duration) = gauss_legendre_algorithm(precision, iterations);
+    println!(
+        "{} 桁の円周率計算を完了しました(実行時間: {:?})",
+        digits, duration
+    );
 
-    // 結果の一部を小数点型で表示
-    // let pi_decimal = pi.to_decimal().value();
-    // let pi_str = pi_decimal.to_string();
-    // let display_len = pi_str.len().min(102); // 3.14... plus some digits
-    // println!(
-    //     "Pi (first {} chars) = {}",
-    //     display_len,
-    //     &pi_str[..display_len]
-    // );
+    // 結果をファイルに保存
+    let mut file = fs::File::create("pi.txt").expect("ファイルの作成に失敗しました");
+    let pi_str = pi.to_string();
+    file.write_all(pi_str.as_bytes())
+        .expect("ファイルへの書き込みに失敗しました");
+    eprintln!("結果を pi.txt に保存しました");
 }
 
 /// Gauss-Legendre法で円周率を計算する関数
 /// https://qiita.com/matsuda_tkm/items/418588d3c59cc8d85ec7
 /// https://ja.wikipedia.org/wiki/ガウス＝ルジャンドルのアルゴリズム
-fn calculate_pi(precision: usize) -> FBig<HalfEven, 2> {
+fn gauss_legendre_algorithm(precision: usize, iterations: usize) -> (FBig<HalfEven, 10>, Duration) {
+    let start = Instant::now();
     // 初期値を設定
-    let one = FBig::<HalfEven, 2>::ONE.with_precision(precision).value();
-    let two = FBig::<HalfEven, 2>::from(2u8)
+    let one = FBig::<HalfEven, 10>::ONE.with_precision(precision).unwrap();
+    let two = FBig::<HalfEven, 10>::from(2u8)
         .with_precision(precision)
-        .value();
-    let four = FBig::<HalfEven, 2>::from(4u8)
+        .unwrap();
+    let four = FBig::<HalfEven, 10>::from(4u8)
         .with_precision(precision)
-        .value();
+        .unwrap();
 
     let mut a = one.clone();
-    let mut b = (&one / &two.sqrt()).with_precision(precision).value();
+    let mut b = (&one / &two.sqrt()).with_precision(precision).unwrap();
     let mut t = &one / &four;
     let mut p = one.clone();
 
-    // 2次収束なので だいたいlog2(precision) 回繰り返せば十分
-    let iterations = ((precision as f64).log2().ceil() as u32).max(10);
+    eprintln!("初期値の計算が終了しました: {:?}", start.elapsed());
 
-    for _ in 0..iterations {
-        let a_next = ((&a + &b) / &two).with_precision(precision).value();
-        let b_next = (&a * &b).sqrt().with_precision(precision).value();
+    for i in 0..iterations {
+        let a_next = ((&a + &b) / &two).with_precision(precision).unwrap();
+        let b_next = (&a * &b).sqrt().with_precision(precision).unwrap();
         let a_diff = &a - &a_next;
         let t_next = &t - &(&p * &a_diff * &a_diff);
 
         a = a_next;
         b = b_next;
         t = t_next;
-        p = (&p * &two).with_precision(precision).value();
+        p = (&p * &two).with_precision(precision).unwrap();
+
+        let elapsed = start.elapsed();
+
+        eprintln!(
+            "{} 回目のループが終了しました: 経過時間: {:?}",
+            i + 1,
+            elapsed
+        );
     }
 
     let sum = &a + &b;
     let numerator = &sum * &sum;
     let denominator = &four * &t;
 
-    (&numerator / &denominator)
-        .with_precision(precision)
-        .value()
+    let duration = start.elapsed();
+
+    (
+        (&numerator / &denominator)
+            .with_precision(precision)
+            .unwrap(),
+        duration,
+    )
 }
