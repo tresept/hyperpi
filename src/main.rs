@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 type BinFloat = FBig<HalfEven, 2>;
 
 fn main() -> std::io::Result<()> {
-    let digits = 1_048_576;
-    // let digits = 4;
+    // let digits = 1_048_576;
+    let digits = 4;
     let filename = "pi.txt";
 
     // 必要なビット精度: 桁数 * log2(10) + 誤差補正
@@ -46,7 +46,7 @@ fn convert_to_decimal_string(
 
     // 整数部が何桁あるかを計算する
     // 整数部だけIBigにすればいいらしい
-    let integer_part = value.clone().to_int().value();
+    let integer_part = value.clone().trunc().to_int().value();
     let integer_str = integer_part.to_string();
     let int_len = integer_str.len();
 
@@ -54,17 +54,21 @@ fn convert_to_decimal_string(
     // ほしい桁数分の整数部 + 小数点部に分ける
     let multiplier = IBig::from(10u8).pow(digits);
     let scaled_value = (value * FBig::from(multiplier).with_precision(precision).value())
+        .trunc()
         .to_int()
         .value();
 
     let full_str = scaled_value.to_string();
 
-    let (first, rest) = full_str.split_at(int_len + digits);
-    let result = if rest.is_empty() {
-        first.to_string()
+    // 整数部の桁数で分割してから、小数部から必要な桁数だけ取り出す
+    let (integer_part_str, decimal_part_full) = full_str.split_at(int_len);
+    let decimal_part = if decimal_part_full.len() > digits {
+        &decimal_part_full[..digits]
     } else {
-        format!("{}.{}", first, rest)
+        decimal_part_full
     };
+
+    let result = format!("{}.{}", integer_part_str, decimal_part);
 
     (result, start.elapsed())
 }
