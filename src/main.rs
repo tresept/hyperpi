@@ -9,24 +9,25 @@ type BinFloat = FBig<HalfEven, 2>;
 
 fn main() -> std::io::Result<()> {
     let digits = 1_000_000;
-
-    println!("=== 円周率計算 ({} 桁) ===\n", digits);
+    let filename = "pi.txt";
 
     // 必要なビット精度を計算: 桁数 * log2(10) + 誤差補正
     let precision = (digits as f64 * 10.0_f64.log2() + 128.0) as usize;
 
+    eprintln!("ただいまより {} 桁の円周率を計算します\n", digits);
+
     // 円周率を計算（2進数）
     let (pi_bin, calc_time) = calculate_pi(precision);
-    println!("計算時間: {:?}", calc_time);
+    eprintln!("計算を {:?} で完了しました", calc_time);
 
     // 10進数文字列に変換
     let (pi_str, conv_time) = convert_to_decimal_string(&pi_bin, digits, precision);
-    println!("変換時間: {:?}", conv_time);
-    println!("合計時間: {:?}\n", calc_time + conv_time);
+    eprintln!("変換を {:?} で完了しました", conv_time);
+    eprintln!("合計時間: {:?}\n", calc_time + conv_time);
 
     // ファイルに保存
-    write_to_file("pi.txt", &pi_str)?;
-    println!("結果を pi.txt に保存しました");
+    write_to_file(filename, &pi_str)?;
+    eprintln!("結果を {} に保存しました", filename);
 
     Ok(())
 }
@@ -78,6 +79,8 @@ fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
     let mut t = &one / &four;
     let mut p = one.clone();
 
+    eprintln!("初期値の計算が完了しました: {:?}", start.elapsed());
+
     // 2次収束なので log2(precision) 回繰り返せば十分
     let iterations = ((precision as f64).log2().ceil() as u32).max(10);
 
@@ -92,7 +95,11 @@ fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
         t = t_next;
         p = (&p * &two).with_precision(precision).value();
 
-        eprintln!("  第 {} 回反復 - 経過時間: {:?}", i + 1, start.elapsed());
+        eprintln!(
+            "第 {} 回のループが完了しました: {:?}",
+            i + 1,
+            start.elapsed()
+        );
     }
 
     // π = (a + b)² / (4t)
