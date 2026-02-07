@@ -9,9 +9,10 @@ type BinFloat = FBig<HalfEven, 2>;
 
 fn main() -> std::io::Result<()> {
     let digits = 1_048_576;
+    // let digits = 4;
     let filename = "pi.txt";
 
-    // 必要なビット精度を計算: 桁数 * log2(10) + 誤差補正
+    // 必要なビット精度: 桁数 * log2(10) + 誤差補正
     let precision = (digits as f64 * 10.0_f64.log2() + 128.0) as usize;
 
     eprintln!("ただいまより {} 桁の円周率を計算します\n", digits);
@@ -26,17 +27,12 @@ fn main() -> std::io::Result<()> {
     eprintln!("合計時間: {:?}\n", calc_time + conv_time);
 
     // ファイルに保存
-    write_to_file(filename, &pi_str)?;
-    eprintln!("結果を {} に保存しました", filename);
-
-    Ok(())
-}
-
-/// ファイルに文字列を書き込む
-fn write_to_file(filename: &str, content: &str) -> std::io::Result<()> {
+    let start_io = Instant::now();
     let file = File::create(filename)?;
     let mut writer = BufWriter::new(file);
-    write!(writer, "{}", content)?;
+    write!(writer, "{}", pi_str)?;
+    eprintln!("ファイル書き込みを {:?} で完了しました", start_io.elapsed());
+
     Ok(())
 }
 
@@ -48,23 +44,27 @@ fn convert_to_decimal_string(
 ) -> (String, Duration) {
     let start = Instant::now();
 
+    // 整数部が何桁あるかを計算する
+    // 整数部だけIBigにすればいいらしい
+    let integer_part = value.clone().to_int().value();
+    let integer_str = integer_part.to_string();
+    let int_len = integer_str.len();
+
     // 10^digits を掛けて整数化する
     // ほしい桁数分の整数部 + 小数点部に分ける
     let multiplier = IBig::from(10u8).pow(digits);
-
-    // value * 10^digits を計算して整数に変換
-    let value_int = (value * FBig::from(multiplier).with_precision(precision).value())
+    let scaled_value = (value * FBig::from(multiplier).with_precision(precision).value())
         .to_int()
         .value();
 
-    // 整数を文字列に変換して小数点を挿入
-    // 分割統治基数変換
-    let value_str = value_int.to_string();
+    let full_str = scaled_value.to_string();
 
-    // ここ気持ち悪いなぁ
-    // TODO: 先頭が一桁で確定してるわけないから，計算結果の桁数に応じて小数点の位置を調整するようにしたい
-    let (first, rest) = value_str.split_at(1);
-    let result = format!("{}.{}", first, rest);
+    let (first, rest) = full_str.split_at(int_len + digits);
+    let result = if rest.is_empty() {
+        first.to_string()
+    } else {
+        format!("{}.{}", first, rest)
+    };
 
     (result, start.elapsed())
 }
