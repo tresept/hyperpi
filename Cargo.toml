@@ -1,6 +1,6 @@
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 [package]
-name = "mathbench"
+name = "hyperpi"
 version = "0.1.0"
 edition = "2024"
 
