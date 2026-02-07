@@ -19,19 +19,22 @@ fn main() -> std::io::Result<()> {
 
     // 円周率を計算（2進数）
     let (pi_bin, calc_time) = calculate_pi(precision);
-    eprintln!("計算を {:?} で完了しました", calc_time);
+    eprintln!("計算を {:.3}s で完了しました", calc_time.as_secs_f64());
 
     // 10進数文字列に変換
     let (pi_str, conv_time) = convert_to_decimal_string(&pi_bin, digits, precision);
-    eprintln!("変換を {:?} で完了しました", conv_time);
-    eprintln!("合計時間: {:?}\n", calc_time + conv_time);
+    eprintln!("変換を {:.3}s で完了しました", conv_time.as_secs_f64());
+    eprintln!("合計時間: {:.3}s\n", (calc_time + conv_time).as_secs_f64());
 
     // ファイルに保存
     let start_io = Instant::now();
     let file = File::create(filename)?;
     let mut writer = BufWriter::new(file);
     write!(writer, "{}", pi_str)?;
-    eprintln!("ファイル書き込みを {:?} で完了しました", start_io.elapsed());
+    eprintln!(
+        "ファイル書き込みを {:.3}s で完了しました",
+        start_io.elapsed().as_secs_f64()
+    );
 
     Ok(())
 }
@@ -90,7 +93,10 @@ fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
     let mut t = &one / &four;
     let mut p = one.clone();
 
-    eprintln!("初期値の計算が完了しました: {:?}", start.elapsed());
+    eprintln!(
+        "初期値の計算が完了しました: {:.3}s",
+        start.elapsed().as_secs_f64()
+    );
 
     // 2次収束なので log2(precision) 回繰り返せば十分
     let iterations = ((precision as f64).log2().ceil() as u32).max(10);
@@ -107,9 +113,9 @@ fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
         p = (&p * &two).with_precision(precision).value();
 
         eprintln!(
-            "第 {} 回のループが完了しました: {:?}",
+            "第 {} 回のループが完了しました: {:.3}s",
             i + 1,
-            start.elapsed()
+            start.elapsed().as_secs_f64()
         );
     }
 
