@@ -9,7 +9,7 @@ type BinFloat = FBig<HalfEven, 2>;
 
 fn main() -> std::io::Result<()> {
     let digits = 1_048_576;
-    // let digits = 4;
+
     let filename = "pi.txt";
 
     // 必要なビット精度: 桁数 * log2(10) + 誤差補正
@@ -119,7 +119,7 @@ fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
         );
     }
 
-    // π = (a + b)² / (4t)
+    // π = (a + b)^2 / (4t)
     let sum = &a + &b;
     let numerator = &sum * &sum;
     let denominator = &four * &t;
