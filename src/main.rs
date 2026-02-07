@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 type BinFloat = FBig<HalfEven, 2>;
 
 fn main() -> std::io::Result<()> {
-    let digits = 1_000_000;
+    let digits = 1_048_576;
     let filename = "pi.txt";
 
     // 必要なビット精度を計算: 桁数 * log2(10) + 誤差補正
@@ -49,13 +49,20 @@ fn convert_to_decimal_string(
     let start = Instant::now();
 
     // 10^digits を掛けて整数化する
+    // ほしい桁数分の整数部 + 小数点部に分ける
     let multiplier = IBig::from(10u8).pow(digits);
+
+    // value * 10^digits を計算して整数に変換
     let value_int = (value * FBig::from(multiplier).with_precision(precision).value())
         .to_int()
         .value();
 
     // 整数を文字列に変換して小数点を挿入
+    // 分割統治基数変換
     let value_str = value_int.to_string();
+
+    // ここ気持ち悪いなぁ
+    // TODO: 先頭が一桁で確定してるわけないから，計算結果の桁数に応じて小数点の位置を調整するようにしたい
     let (first, rest) = value_str.split_at(1);
     let result = format!("{}.{}", first, rest);
 
