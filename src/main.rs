@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 type BinFloat = FBig<HalfEven, 2>;
 
 fn main() -> std::io::Result<()> {
-    // let digits = 1_048_576;
-    let digits = 4;
+    let digits = 1_048_576;
+    // let digits = 4;
     let filename = "pi.txt";
 
     // 必要なビット精度: 桁数 * log2(10) + 誤差補正
