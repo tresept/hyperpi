@@ -136,7 +136,13 @@ where
     (pi, start.elapsed())
 }
 
-fn calc_chudnovsky() {}
+pub fn calc_chudnovsky() {
+    let C = 640320;
+    let A = 13591409;
+    let B = 545140134;
+    let D = 426880;
+    let E = 10005;
+}
 
 #[cfg(test)]
 mod tests {
