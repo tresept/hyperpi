@@ -6,13 +6,46 @@ use std::time::{Duration, Instant};
 
 type BinFloat = FBig<HalfEven, 2>;
 
+/// Gauss-Legendre法のプログレス情報
+#[derive(Debug, Clone)]
+pub struct GaussLegendreProgress {
+    /// 現在の反復回数（0が初期化）
+    pub iteration: u32,
+    /// 総反復回数
+    pub total_iterations: u32,
+    /// 計算開始からの経過時間
+    pub elapsed: Duration,
+    /// 現在のフェーズ（"初期化", "計算中", "完了"など）
+    pub phase: &'static str,
+    /// 追加のカスタムメッセージ
+    pub message: Option<String>,
+}
+
+/// 10進数変換のプログレス情報
+#[derive(Debug, Clone)]
+pub struct DecimalConversionProgress {
+    /// 計算開始からの経過時間
+    pub elapsed: Duration,
+    /// 現在のフェーズ（"10進数変換中", "10進数変換完了"など）
+    pub phase: &'static str,
+}
+
 /// 2進数表現のFBigを10進数文字列に変換する
-pub fn convert_to_decimal_string(
+pub fn convert_to_decimal_string<F>(
     value: &BinFloat,
     digits: usize,
     precision: usize,
-) -> (String, Duration) {
+    mut on_progress: F,
+) -> (String, Duration)
+where
+    F: FnMut(DecimalConversionProgress),
+{
     let start = Instant::now();
+
+    on_progress(DecimalConversionProgress {
+        elapsed: start.elapsed(),
+        phase: "10進数変換中",
+    });
 
     // 整数部が何桁あるかを計算する
     // 整数部だけIBigにすればいいらしい
@@ -40,6 +73,11 @@ pub fn convert_to_decimal_string(
 
     let result = format!("{}.{}", integer_part_str, decimal_part);
 
+    on_progress(DecimalConversionProgress {
+        elapsed: start.elapsed(),
+        phase: "10進数変換完了",
+    });
+
     (result, start.elapsed())
 }
 
@@ -47,12 +85,22 @@ pub fn convert_to_decimal_string(
 ///
 /// アルゴリズム: https://ja.wikipedia.org/wiki/ガウス＝ルジャンドルのアルゴリズム
 /// 参考: https://qiita.com/matsuda_tkm/items/418588d3c59cc8d85ec7
-pub fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
+pub fn calc_gauss_legendre<F>(precision: usize, mut on_progress: F) -> (BinFloat, Duration)
+where
+    F: FnMut(GaussLegendreProgress),
+{
     let start = Instant::now();
 
     // 2次収束なので log2(precision) 回繰り返せば十分
     let iterations = ((precision as f64).log2().ceil() as u32).max(10);
-    eprintln!("{} 回のループとなります", iterations);
+
+    on_progress(GaussLegendreProgress {
+        iteration: 0,
+        total_iterations: iterations,
+        elapsed: start.elapsed(),
+        phase: "初期化",
+        message: Some(format!("{} 回のループを実行します", iterations)),
+    });
 
     // 初期値を設定
     let one = BinFloat::ONE.with_precision(precision).value();
@@ -64,10 +112,13 @@ pub fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
     let mut t = &one / &four;
     let mut p = one.clone();
 
-    eprintln!(
-        "初期値の計算が完了しました: {:.3}s",
-        start.elapsed().as_secs_f64()
-    );
+    on_progress(GaussLegendreProgress {
+        iteration: 0,
+        total_iterations: iterations,
+        elapsed: start.elapsed(),
+        phase: "計算中",
+        message: Some("初期値の計算が完了しました".to_string()),
+    });
 
     for i in 0..iterations {
         let a_next = ((&a + &b) / &two).with_precision(precision).value();
@@ -80,11 +131,13 @@ pub fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
         t = t_next;
         p = (&p * &two).with_precision(precision).value();
 
-        eprintln!(
-            "第 {} 回のループが完了しました: {:.3}s",
-            i + 1,
-            start.elapsed().as_secs_f64()
-        );
+        on_progress(GaussLegendreProgress {
+            iteration: i + 1,
+            total_iterations: iterations,
+            elapsed: start.elapsed(),
+            phase: "計算中",
+            message: None,
+        });
     }
 
     // π = (a + b)^2 / (4t)
@@ -94,6 +147,14 @@ pub fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
     let pi = (&numerator / &denominator)
         .with_precision(precision)
         .value();
+
+    on_progress(GaussLegendreProgress {
+        iteration: iterations,
+        total_iterations: iterations,
+        elapsed: start.elapsed(),
+        phase: "完了",
+        message: None,
+    });
 
     (pi, start.elapsed())
 }

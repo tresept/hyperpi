@@ -1,11 +1,15 @@
 use colorgrad::Gradient;
+use indicatif::{ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::time::Instant;
 
 mod calculation;
-use calculation::{calculate_pi, convert_to_decimal_string};
+use calculation::{
+    DecimalConversionProgress, GaussLegendreProgress, calc_gauss_legendre,
+    convert_to_decimal_string,
+};
 
 /// 1行のテキストにグラデーションを適用する関数
 /// 虹色グラデーション（シアン → グリーン → イエロー → マゼンタ）
@@ -69,12 +73,76 @@ fn main() -> std::io::Result<()> {
 
     eprintln!("ただいまより {} 桁の円周率を計算します\n", digits);
 
+    // プログレスバー/スピナーの設定
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} [{elapsed_precise}] {msg}")
+            .unwrap()
+            .tick_chars("▖▗▘▙▚▛▜▝▞▟"),
+    );
+
     // 円周率を計算（2進数）
-    let (pi_bin, calc_time) = calculate_pi(precision);
-    eprintln!("計算を {:.3}s で完了しました", calc_time.as_secs_f64());
+    let (pi_bin, calc_time) = calc_gauss_legendre(precision, |info: GaussLegendreProgress| {
+        match info.phase {
+            "初期化" => {
+                if let Some(msg) = info.message {
+                    eprintln!("{}", msg);
+                }
+                spinner.set_message("初期値を計算中...");
+            }
+            "計算中" => {
+                if let Some(msg) = &info.message {
+                    spinner.set_message(msg.clone());
+                } else {
+                    let progress_pct =
+                        (info.iteration as f64 / info.total_iterations as f64) * 100.0;
+                    spinner.set_message(format!(
+                        "Gauss-Legendre法: {}/{} 回 ({:.1}%)",
+                        info.iteration, info.total_iterations, progress_pct
+                    ));
+                }
+            }
+            "完了" => {
+                spinner
+                    .finish_with_message(format!("計算完了: {:.3}s", info.elapsed.as_secs_f64()));
+            }
+            _ => {}
+        }
+        spinner.tick();
+    });
+    eprintln!();
 
     // 10進数文字列に変換
-    let (pi_str, _) = convert_to_decimal_string(&pi_bin, digits, precision);
+    let conversion_spinner = ProgressBar::new_spinner();
+    conversion_spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} [{elapsed_precise}] {msg}")
+            .unwrap()
+            .tick_chars("▖▗▘▙▚▛▜▝▞▟"),
+    );
+
+    let (pi_str, _) = convert_to_decimal_string(
+        &pi_bin,
+        digits,
+        precision,
+        |info: DecimalConversionProgress| {
+            match info.phase {
+                "10進数変換中" => {
+                    conversion_spinner.set_message("10進数に変換中...");
+                }
+                "10進数変換完了" => {
+                    conversion_spinner.finish_with_message(format!(
+                        "10進数変換完了: {:.3}s",
+                        info.elapsed.as_secs_f64()
+                    ));
+                }
+                _ => {}
+            }
+            conversion_spinner.tick();
+        },
+    );
+    eprintln!();
 
     // ファイルに保存
     let start_io = Instant::now();
@@ -82,13 +150,10 @@ fn main() -> std::io::Result<()> {
     let mut writer = BufWriter::new(file);
     write!(writer, "{}", pi_str)?;
     let io_time = start_io.elapsed();
-    eprintln!(
-        "ファイル書き込みを {:.3}s で完了しました",
-        io_time.as_secs_f64()
-    );
+    eprintln!("ファイル書き込み完了: {:.3}s", io_time.as_secs_f64());
 
     eprintln!(
-        "合計 {:.3}s で完了しました",
+        "\n✨ 合計 {:.3}s で完了しました ✨",
         (calc_time.as_secs_f64() + io_time.as_secs_f64())
     );
 
