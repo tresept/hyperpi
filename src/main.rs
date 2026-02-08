@@ -1,12 +1,14 @@
 use colorgrad::Gradient;
 use indicatif::{ProgressBar, ProgressStyle};
+use inquire::{Confirm, CustomType};
 use owo_colors::OwoColorize;
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::time::{Duration, Instant};
+use sysinfo::System;
 
 mod calculation;
-use calculation::{calc_gauss_legendre, convert_to_decimal_string, GaussLegendreProgress};
+use calculation::{GaussLegendreProgress, calc_gauss_legendre, convert_to_decimal_string};
 
 macro_rules! hex_color {
     ($hex:expr) => {{
@@ -24,8 +26,8 @@ macro_rules! hex_color {
 fn gradient_line(text: &str) -> String {
     let gradient = colorgrad::GradientBuilder::new()
         .colors(&[
-            colorgrad::Color::from_rgba8(0, 255, 255, 255), // シアン
-            colorgrad::Color::from_rgba8(143, 250, 171, 255), // グリーン
+            // colorgrad::Color::from_rgba8(0, 255, 255, 255), // シアン
+            // colorgrad::Color::from_rgba8(143, 250, 171, 255), // グリーン
             colorgrad::Color::from_rgba8(250, 214, 77, 255), // イエロー
             colorgrad::Color::from_rgba8(250, 122, 205, 255), // マゼンタ
         ])
@@ -70,6 +72,10 @@ fn logo() -> String {
 }
 
 fn main() -> std::io::Result<()> {
+    let mut sys = System::new_all();
+
+    sys.refresh_memory();
+
     const VERSION: &str = env!("CARGO_PKG_VERSION");
 
     eprintln!("{}", gradient_text(logo()).bold());
@@ -80,7 +86,27 @@ fn main() -> std::io::Result<()> {
             .bold()
     );
 
-    let digits = 1048576;
+    let total_memory = sys.total_memory();
+    let available_memory = sys.available_memory();
+
+    let digits: usize = CustomType::<usize>::new("計算する円周率の桁数を入力")
+        .with_default(1_048_576)
+        .with_help_message("小数点以下の桁数を正の整数で入力してください")
+        .with_error_message("usizeの範囲内で正しい数値を入力してください")
+        .prompt()
+        .map_err(|_| Error::new(ErrorKind::Interrupted, "Cancelled"))?;
+
+    let message = format!("{} 桁の円周率を計算します．よろしいですか？", digits)
+        .cyan()
+        .to_string();
+    if !Confirm::new(&message)
+        .with_default(true)
+        .prompt()
+        .map_err(|_| Error::new(ErrorKind::Interrupted, "Aborted"))?
+    {
+        println!("{}", "要求は中断されました".bright_black());
+        return Ok(());
+    }
 
     let filename = "pi.txt";
 
@@ -88,6 +114,15 @@ fn main() -> std::io::Result<()> {
     let precision = (digits as f64 * 10.0_f64.log2() + 128.0) as usize;
 
     eprintln!("ただいまより {} 桁の円周率を計算します\n", digits);
+    eprintln!("ハードウェア情報:  ");
+    eprintln!(
+        "  合計メモリ: {:.2} GiB",
+        (total_memory as f64 / 1024.0 / 1024.0 / 1024.0)
+    );
+    eprintln!(
+        "  利用可能メモリ: {:.2} GiB",
+        (available_memory as f64 / 1024.0 / 1024.0 / 1024.0)
+    );
 
     // プログレスバー/スピナーの設定
     let spinner = ProgressBar::new_spinner();

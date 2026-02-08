@@ -1,5 +1,5 @@
 use dashu::base::SquareRoot;
-use dashu::float::{round::mode::HalfEven, FBig};
+use dashu::float::{FBig, round::mode::HalfEven};
 use dashu::integer::IBig;
 
 use std::time::{Duration, Instant};
@@ -76,7 +76,7 @@ where
         total_iterations: iterations,
         elapsed: start.elapsed(),
         phase: "初期化",
-        message: Some(format!("{} 回のループを実行します", iterations)),
+        message: None,
     });
 
     // 初期値を設定
@@ -134,4 +134,78 @@ where
     });
 
     (pi, start.elapsed())
+}
+
+fn calc_chudnovsky() {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gauss_legendre_10_digits() {
+        // 10桁精度の円周率を計算
+        let digits = 10;
+        // 2進数精度は10進数の桁数 * log2(10) ≈ 桁数 * 3.32 + マージン
+        let precision = (digits as f64 * 3.32 * 1.5) as usize;
+
+        let (pi, _duration) = calc_gauss_legendre(precision, |_progress| {
+            // テスト中はプログレス情報を無視
+        });
+
+        // 2進数表現を10進数文字列に変換
+        let (pi_str, _convert_duration) = convert_to_decimal_string(&pi, digits, precision);
+
+        // 期待される円周率の値（10桁）
+        let expected = "3.1415926535";
+
+        // 小数点以下10桁まで一致することを確認
+        assert_eq!(
+            &pi_str[..expected.len()],
+            expected,
+            "計算された円周率が期待値と一致しません\n計算値: {}\n期待値: {}",
+            pi_str,
+            expected
+        );
+
+        // 念のため、各桁を個別にチェック
+        let pi_chars: Vec<char> = pi_str.chars().collect();
+        let expected_chars: Vec<char> = expected.chars().collect();
+
+        for (i, (calc_char, exp_char)) in pi_chars.iter().zip(expected_chars.iter()).enumerate() {
+            assert_eq!(
+                calc_char, exp_char,
+                "{}桁目が一致しません: 計算値='{}', 期待値='{}'",
+                i, calc_char, exp_char
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_legendre_progress_callback() {
+        // プログレスコールバックが正しく呼ばれることを確認
+        let precision = 100;
+        let mut progress_count = 0;
+        let mut last_iteration = 0;
+
+        let (_pi, _duration) = calc_gauss_legendre(precision, |progress| {
+            progress_count += 1;
+            last_iteration = progress.iteration;
+
+            // プログレス情報の妥当性チェック
+            assert!(progress.iteration <= progress.total_iterations);
+            assert!(
+                progress.phase == "初期化"
+                    || progress.phase == "計算中"
+                    || progress.phase == "完了"
+            );
+        });
+
+        // プログレスコールバックが少なくとも複数回呼ばれていることを確認
+        assert!(
+            progress_count > 1,
+            "プログレスコールバックが呼ばれていません"
+        );
+        assert!(last_iteration > 0, "反復計算が実行されていません");
+    }
 }
