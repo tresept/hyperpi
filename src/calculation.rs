@@ -136,12 +136,30 @@ where
     (pi, start.elapsed())
 }
 
-pub fn calc_chudnovsky() {
-    let C = 640320;
-    let A = 13591409;
-    let B = 545140134;
-    let D = 426880;
-    let E = 10005;
+/// 階乗計算用
+fn factorial(n: i32) -> f64 {
+    (1..=n).fold(1.0, |acc, i| acc * i as f64)
+}
+/// チュドノフスキー法での円周率計算（feat)
+pub fn calc_chudnovsky(n: i32) -> f64 {
+    let a: f64 = 13591409.0;
+    let b: f64 = 545140134.0;
+    let c: f64 = 640320.0;
+
+    let mut sum = 0.0;
+
+    for k in 0..n {
+        let k_f = k as f64;
+        let sgn = if k % 2 == 0 { 1.0 } else { -1.0 };
+
+        let tk = (12.0 / (c * c.sqrt()))
+            * ((sgn * factorial(6 * k)) / (factorial(3 * k) * factorial(k).powi(3)))
+            * ((a + b * k_f) / (c.powi(3 * k)));
+
+        sum += tk;
+    }
+
+    1.0 / sum
 }
 
 #[cfg(test)]
