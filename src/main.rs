@@ -49,18 +49,6 @@ fn gradient_text(text: &str) -> String {
         .collect::<Vec<String>>()
         .join("\n")
 }
-
-// fn logo() -> String {
-//     let logo_text = r#"
-// █  █ █  █  ██  ███ ███   █████
-// █  █ █  █ █  █ █   █  █   █ █
-// ████  █ █ █  █ ██  ███    █ █
-// █  █   █  █ █  █   █  █   █ █
-// █  █  █   █    ███ █   █  █  █
-// "#;
-//     format!("{}", logo_text)
-// }
-
 fn logo() -> String {
     let logo_text = r#"
 ░█░█░█░█░█▀█░█▀▀░█▀▄░█▀█░▀█▀
