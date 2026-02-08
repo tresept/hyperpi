@@ -1,13 +1,77 @@
+use colorgrad::Gradient;
 use dashu::base::SquareRoot;
 use dashu::float::{FBig, round::mode::HalfEven};
 use dashu::integer::IBig;
+use owo_colors::OwoColorize;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::time::{Duration, Instant};
 
 type BinFloat = FBig<HalfEven, 2>;
 
+/// 1行のテキストにグラデーションを適用する関数
+/// 虹色グラデーション（シアン → グリーン → イエロー → マゼンタ）
+fn gradient_line(text: &str) -> String {
+    let gradient = colorgrad::GradientBuilder::new()
+        .colors(&[
+            colorgrad::Color::from_rgba8(0, 255, 255, 255), // シアン
+            colorgrad::Color::from_rgba8(143, 250, 171, 255), // グリーン
+            colorgrad::Color::from_rgba8(250, 214, 77, 255), // イエロー
+            colorgrad::Color::from_rgba8(250, 122, 205, 255), // マゼンタ
+        ])
+        .build::<colorgrad::LinearGradient>()
+        .unwrap();
+
+    let len = text.chars().count();
+    if len == 0 {
+        return String::new();
+    }
+
+    text.chars()
+        .enumerate()
+        .map(|(i, c)| {
+            // 各文字の位置に応じてグラデーションの色を取得（0.0〜1.0）
+            let t = if len == 1 {
+                0.5
+            } else {
+                i as f32 / (len - 1) as f32
+            };
+            let color = gradient.at(t).to_rgba8();
+            format!("{}", c.to_string().truecolor(color[0], color[1], color[2]))
+        })
+        .collect()
+}
+
+/// 複数行のテキストを行ごとにグラデーション適用する関数
+fn gradient_text(text: &str) -> String {
+    text.lines()
+        .map(|line| gradient_line(line))
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+// fn logo() -> String {
+//     let logo_text = r#"
+// █  █ █  █  ██  ███ ███   █████
+// █  █ █  █ █  █ █   █  █   █ █
+// ████  █ █ █  █ ██  ███    █ █
+// █  █   █  █ █  █   █  █   █ █
+// █  █  █   █    ███ █   █  █  █
+// "#;
+//     format!("{}", logo_text)
+// }
+
+fn logo() -> String {
+    let logo_text = r#"
+░█░█░█░█░█▀█░█▀▀░█▀▄░█▀█░▀█▀
+░█▀█░░█░░█▀▀░█▀▀░█▀▄░█▀▀░░█░
+░▀░▀░░▀░░▀░░░▀▀▀░▀░▀░▀░░░▀▀▀
+"#;
+    format!("{}", logo_text)
+}
 fn main() -> std::io::Result<()> {
+    eprintln!("{}", gradient_text(&logo()).bold());
+
     let digits = 1_048_576;
 
     let filename = "pi.txt";
