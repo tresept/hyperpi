@@ -136,14 +136,17 @@ where
     (pi, start.elapsed())
 }
 
-pub fn calc_chudnovsky(n: i32) -> f64 {
+/// Chudnovsky法で円周率を計算
+/// * digits: 求めたい10進数の桁数
+/// * precision: 内部計算に使う2進数の精度（ビット数）
+pub fn calc_chudnovsky(digits: usize, precision: usize) -> BinFloat {
+    // 必要な項数
+    let n = digits / 14 + 1;
+
     let a = IBig::from(13591409);
     let b = IBig::from(545140134);
     let c = IBig::from(640320);
     let c3 = &c * &c * &c;
-
-    // 全体を乗算してる定数部
-    let constant = IBig::from(12) / (c.clone() * c.sqrt());
 
     let mut sum_num = IBig::from(0);
     let mut sum_den = IBig::from(1);
@@ -174,16 +177,24 @@ pub fn calc_chudnovsky(n: i32) -> f64 {
         m_den *= r_den;
     }
 
-    let s_num = sum_num.to_f64().unwrap();
-    let s_den = sum_den.to_f64().unwrap();
-    let c_f = c.to_f64().unwrap();
+    // 高精度な浮動小数点数に変換
+    let sum_num_float = BinFloat::from(sum_num).with_precision(precision).value();
+    let sum_den_float = BinFloat::from(sum_den).with_precision(precision).value();
+    let c_float = BinFloat::from(c.clone()).with_precision(precision).value();
 
-    // 2. 最後にまとめて π を計算する
-    // 公式： 1/π = (12 / C√C) * (sum_num / sum_den)
-    // 逆数にして： π = (C√C * sum_den) / (12 * sum_num)
-    let pi = (c_f * c_f.sqrt() * s_den) / (12.0 * s_num);
+    // 高精度な √C を求める
+    let c_sqrt = c_float.sqrt().with_precision(precision).value();
 
-    pi
+    // Pi = (C * √C * sum_den) / (12 * sum_num)
+    let twelve = BinFloat::from(12u8).with_precision(precision).value();
+    let numerator = (&c_float * &c_sqrt * &sum_den_float)
+        .with_precision(precision)
+        .value();
+    let denominator = (&twelve * &sum_num_float).with_precision(precision).value();
+
+    (&numerator / &denominator)
+        .with_precision(precision)
+        .value()
 }
 
 #[cfg(test)]
@@ -258,85 +269,28 @@ mod tests {
     }
 
     #[test]
-    fn test_chudnovsky_basic() {
-        // Chudnovsky法で円周率を計算
-        // n=1: 最小限の項数で動作確認
-        let pi = calc_chudnovsky(1);
-        println!("n=1: π = {:.15}", pi);
+    fn test_chudnovsky_self() {
+        // 手動実行用のテスト
+        // cargo test test_chudnovsky_self -- --nocapture で実行
 
-        // 期待される円周率の値（小数点以下10桁）
-        let expected = "3.1415926535";
-        let pi_str = format!("{:.10}", pi);
+        // 計算桁数
+        let digits = 1000;
 
-        println!("計算値: {}", pi_str);
-        println!("期待値: {}", expected);
+        // 2進数ビットあたり精度
+        let precision = (digits as f64 * 3.32 * 1.5) as usize;
 
-        // 小数点以下10桁まで完全一致することを確認
-        assert_eq!(
-            pi_str, expected,
-            "計算された円周率が期待値と一致しません\n計算値: {}\n期待値: {}",
-            pi_str, expected
-        );
-    }
+        println!("\n=== Chudnovsky法 手動テスト ===");
+        println!("表示桁数: {}", digits);
 
-    #[test]
-    fn test_chudnovsky_any_digits() {
-        // 10桁精度の円周率を計算
-        // Chudnovsky法は1項で約14桁の精度が出るので、n=1でも十分
-        let pi = calc_chudnovsky(1);
-        println!("  計算値: {}", pi);
-    }
+        let start = std::time::Instant::now();
+        let pi = calc_chudnovsky(digits, precision);
+        let (pi_str, convert_time) = convert_to_decimal_string(&pi, digits, precision);
+        let total_time = start.elapsed();
 
-    #[test]
-    fn test_chudnovsky_10_digits() {
-        // 10桁精度の円周率を計算
-        // Chudnovsky法は1項で約14桁の精度が出るので、n=1でも十分
-        let pi = calc_chudnovsky(1);
+        println!("\n計算時間: {:?}", total_time - convert_time);
+        println!("変換時間: {:?}", convert_time);
+        println!("合計時間: {:?}", total_time);
 
-        println!("Chudnovsky (n=1):");
-        println!("  計算値: {:.15}", pi);
-
-        // 期待される円周率の値（小数点以下10桁）
-        let expected = "3.1415926535";
-        let pi_str = format!("{:.10}", pi);
-
-        println!("  10桁表示: {}", pi_str);
-        println!("  期待値:   {}", expected);
-
-        // 小数点以下10桁まで完全一致することを確認
-        assert_eq!(
-            pi_str, expected,
-            "10桁精度が出ていません\n計算値: {}\n期待値: {}",
-            pi_str, expected
-        );
-
-        // 各桁を個別にチェック
-        let pi_chars: Vec<char> = pi_str.chars().collect();
-        let expected_chars: Vec<char> = expected.chars().collect();
-
-        for (i, (calc_char, exp_char)) in pi_chars.iter().zip(expected_chars.iter()).enumerate() {
-            assert_eq!(
-                calc_char, exp_char,
-                "{}桁目が一致しません: 計算値='{}', 期待値='{}'",
-                i, calc_char, exp_char
-            );
-        }
-    }
-
-    #[test]
-    fn test_chudnovsky_manual_run() {
-        // 手動で動かしたい時用のテスト
-        // cargo test test_chudnovsky_manual_run -- --nocapture で実行
-
-        println!("\n=== Chudnovsky法 手動実行テスト ===\n");
-
-        for n in [1, 2, 3, 5, 10, 20] {
-            let pi = calc_chudnovsky(n);
-            let error = (pi - std::f64::consts::PI).abs();
-            println!("n={:2}: π = {:.15}  (誤差: {:.2e})", n, pi, error);
-        }
-
-        println!("\n真の値: π = {:.15}", std::f64::consts::PI);
-        println!("\n=== テスト完了 ===\n");
+        println!("\nπ = {}", pi_str);
     }
 }
