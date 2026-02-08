@@ -7,6 +7,8 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::time::{Duration, Instant};
 
+use indicatif::{ProgressBar, ProgressStyle};
+
 type BinFloat = FBig<HalfEven, 2>;
 
 /// 1行のテキストにグラデーションを適用する関数
@@ -51,13 +53,14 @@ fn gradient_text(text: &str) -> String {
 }
 
 fn logo() -> String {
-    let logo_text = r#"
+    r#"
 ░█░█░█░█░█▀█░█▀▀░█▀▄░█▀█░▀█▀
 ░█▀█░░█░░█▀▀░█▀▀░█▀▄░█▀▀░░█░
 ░▀░▀░░▀░░▀░░░▀▀▀░▀░▀░▀░░░▀▀▀
-"#;
-    format!("{}", logo_text)
+"#
+    .to_string()
 }
+
 fn main() -> std::io::Result<()> {
     eprintln!("{}", gradient_text(&logo()).bold());
 
