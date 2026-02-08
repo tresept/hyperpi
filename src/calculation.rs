@@ -136,30 +136,54 @@ where
     (pi, start.elapsed())
 }
 
-/// 階乗計算用
-fn factorial(n: i32) -> f64 {
-    (1..=n).fold(1.0, |acc, i| acc * i as f64)
-}
-/// チュドノフスキー法での円周率計算（feat)
 pub fn calc_chudnovsky(n: i32) -> f64 {
-    let a: f64 = 13591409.0;
-    let b: f64 = 545140134.0;
-    let c: f64 = 640320.0;
+    let a = IBig::from(13591409);
+    let b = IBig::from(545140134);
+    let c = IBig::from(640320);
+    let c3 = &c * &c * &c;
 
-    let mut sum = 0.0;
+    // 全体を乗算してる定数部
+    let constant = IBig::from(12) / (c.clone() * c.sqrt());
+
+    let mut sum_num = IBig::from(0);
+    let mut sum_den = IBig::from(1);
+
+    // 符号・階乗・分母をひとまとめにした重み
+    // 差分計算による漸化式で更新していく
+    let mut m_num = IBig::from(1);
+    let mut m_den = IBig::from(1);
 
     for k in 0..n {
-        let k_f = k as f64;
-        let sgn = if k % 2 == 0 { 1.0 } else { -1.0 };
+        let k_big = IBig::from(k);
 
-        let tk = (12.0 / (c * c.sqrt()))
-            * ((sgn * factorial(6 * k)) / (factorial(3 * k) * factorial(k).powi(3)))
-            * ((a + b * k_f) / (c.powi(3 * k)));
+        // 定義通りの T_k を、m と (A + Bk) の掛け算で再現
+        let tk_num = &m_num * (&a + &b * &k_big);
+        let tk_den = &m_den;
 
-        sum += tk;
+        // 次の項(k+1)のために m を更新
+        // これが漸化式（差分更新）の核
+        let r_num = (IBig::from(12) * &k_big + 2)
+            * (IBig::from(12) * &k_big + 6)
+            * (IBig::from(12) * &k_big + 10);
+        let r_den = (IBig::from(k + 1).pow(3)) * (-&c3);
+
+        sum_num = &sum_num * tk_den + tk_num * &sum_den;
+        sum_den = &sum_den * tk_den;
+
+        m_num *= r_num;
+        m_den *= r_den;
     }
 
-    1.0 / sum
+    let s_num = sum_num.to_f64().unwrap();
+    let s_den = sum_den.to_f64().unwrap();
+    let c_f = c.to_f64().unwrap();
+
+    // 2. 最後にまとめて π を計算する
+    // 公式： 1/π = (12 / C√C) * (sum_num / sum_den)
+    // 逆数にして： π = (C√C * sum_den) / (12 * sum_num)
+    let pi = (c_f * c_f.sqrt() * s_den) / (12.0 * s_num);
+
+    pi
 }
 
 #[cfg(test)]
@@ -231,5 +255,88 @@ mod tests {
             "プログレスコールバックが呼ばれていません"
         );
         assert!(last_iteration > 0, "反復計算が実行されていません");
+    }
+
+    #[test]
+    fn test_chudnovsky_basic() {
+        // Chudnovsky法で円周率を計算
+        // n=1: 最小限の項数で動作確認
+        let pi = calc_chudnovsky(1);
+        println!("n=1: π = {:.15}", pi);
+
+        // 期待される円周率の値（小数点以下10桁）
+        let expected = "3.1415926535";
+        let pi_str = format!("{:.10}", pi);
+
+        println!("計算値: {}", pi_str);
+        println!("期待値: {}", expected);
+
+        // 小数点以下10桁まで完全一致することを確認
+        assert_eq!(
+            pi_str, expected,
+            "計算された円周率が期待値と一致しません\n計算値: {}\n期待値: {}",
+            pi_str, expected
+        );
+    }
+
+    #[test]
+    fn test_chudnovsky_any_digits() {
+        // 10桁精度の円周率を計算
+        // Chudnovsky法は1項で約14桁の精度が出るので、n=1でも十分
+        let pi = calc_chudnovsky(1);
+        println!("  計算値: {}", pi);
+    }
+
+    #[test]
+    fn test_chudnovsky_10_digits() {
+        // 10桁精度の円周率を計算
+        // Chudnovsky法は1項で約14桁の精度が出るので、n=1でも十分
+        let pi = calc_chudnovsky(1);
+
+        println!("Chudnovsky (n=1):");
+        println!("  計算値: {:.15}", pi);
+
+        // 期待される円周率の値（小数点以下10桁）
+        let expected = "3.1415926535";
+        let pi_str = format!("{:.10}", pi);
+
+        println!("  10桁表示: {}", pi_str);
+        println!("  期待値:   {}", expected);
+
+        // 小数点以下10桁まで完全一致することを確認
+        assert_eq!(
+            pi_str, expected,
+            "10桁精度が出ていません\n計算値: {}\n期待値: {}",
+            pi_str, expected
+        );
+
+        // 各桁を個別にチェック
+        let pi_chars: Vec<char> = pi_str.chars().collect();
+        let expected_chars: Vec<char> = expected.chars().collect();
+
+        for (i, (calc_char, exp_char)) in pi_chars.iter().zip(expected_chars.iter()).enumerate() {
+            assert_eq!(
+                calc_char, exp_char,
+                "{}桁目が一致しません: 計算値='{}', 期待値='{}'",
+                i, calc_char, exp_char
+            );
+        }
+    }
+
+    #[test]
+    fn test_chudnovsky_manual_run() {
+        // 手動で動かしたい時用のテスト
+        // cargo test test_chudnovsky_manual_run -- --nocapture で実行
+
+        println!("\n=== Chudnovsky法 手動実行テスト ===\n");
+
+        for n in [1, 2, 3, 5, 10, 20] {
+            let pi = calc_chudnovsky(n);
+            let error = (pi - std::f64::consts::PI).abs();
+            println!("n={:2}: π = {:.15}  (誤差: {:.2e})", n, pi, error);
+        }
+
+        println!("\n真の値: π = {:.15}", std::f64::consts::PI);
+        println!("\n=== テスト完了 ===\n");
     }
 }
