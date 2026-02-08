@@ -1,5 +1,5 @@
 use dashu::base::SquareRoot;
-use dashu::float::{FBig, round::mode::HalfEven};
+use dashu::float::{round::mode::HalfEven, FBig};
 use dashu::integer::IBig;
 
 use std::time::{Duration, Instant};
@@ -21,31 +21,13 @@ pub struct GaussLegendreProgress {
     pub message: Option<String>,
 }
 
-/// 10進数変換のプログレス情報
-#[derive(Debug, Clone)]
-pub struct DecimalConversionProgress {
-    /// 計算開始からの経過時間
-    pub elapsed: Duration,
-    /// 現在のフェーズ（"10進数変換中", "10進数変換完了"など）
-    pub phase: &'static str,
-}
-
 /// 2進数表現のFBigを10進数文字列に変換する
-pub fn convert_to_decimal_string<F>(
+pub fn convert_to_decimal_string(
     value: &BinFloat,
     digits: usize,
     precision: usize,
-    mut on_progress: F,
-) -> (String, Duration)
-where
-    F: FnMut(DecimalConversionProgress),
-{
+) -> (String, Duration) {
     let start = Instant::now();
-
-    on_progress(DecimalConversionProgress {
-        elapsed: start.elapsed(),
-        phase: "10進数変換中",
-    });
 
     // 整数部が何桁あるかを計算する
     // 整数部だけIBigにすればいいらしい
@@ -72,11 +54,6 @@ where
     };
 
     let result = format!("{}.{}", integer_part_str, decimal_part);
-
-    on_progress(DecimalConversionProgress {
-        elapsed: start.elapsed(),
-        phase: "10進数変換完了",
-    });
 
     (result, start.elapsed())
 }

@@ -8,6 +8,17 @@ use std::time::{Duration, Instant};
 mod calculation;
 use calculation::{calc_gauss_legendre, convert_to_decimal_string, GaussLegendreProgress};
 
+macro_rules! hex_color {
+    ($hex:expr) => {{
+        let h = $hex.trim_start_matches('#');
+        owo_colors::Rgb(
+            u8::from_str_radix(&h[0..2], 16).unwrap(),
+            u8::from_str_radix(&h[2..4], 16).unwrap(),
+            u8::from_str_radix(&h[4..6], 16).unwrap(),
+        )
+    }};
+}
+
 /// 1行のテキストにグラデーションを適用する関数
 /// 虹色グラデーション（シアン → グリーン → イエロー → マゼンタ）
 fn gradient_line(text: &str) -> String {
@@ -42,7 +53,7 @@ fn gradient_line(text: &str) -> String {
 }
 
 /// 複数行のテキストを行ごとにグラデーション適用する関数
-fn gradient_text(text: &str) -> String {
+fn gradient_text(text: String) -> String {
     text.lines()
         .map(gradient_line)
         .collect::<Vec<String>>()
@@ -59,7 +70,15 @@ fn logo() -> String {
 }
 
 fn main() -> std::io::Result<()> {
-    eprintln!("{}", gradient_text(&logo()).bold());
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+    eprintln!("{}", gradient_text(logo()).bold());
+    eprintln!(
+        "{}",
+        format!("  Welcome to HyperPi v{}\n", VERSION)
+            .color(hex_color!("#87cefa"))
+            .bold()
+    );
 
     let digits = 1048576;
 
@@ -115,9 +134,7 @@ fn main() -> std::io::Result<()> {
     eprintln!();
 
     // 10進数文字列に変換（スピナーなし、時間だけ表示）
-    let (pi_str, conversion_time) = convert_to_decimal_string(&pi_bin, digits, precision, |_| {
-        // 何もしない（スピナーを表示しない）
-    });
+    let (pi_str, conversion_time) = convert_to_decimal_string(&pi_bin, digits, precision);
     eprintln!("✓ 10進数変換完了: {:.3}s", conversion_time.as_secs_f64());
 
     // ファイルに保存
