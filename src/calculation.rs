@@ -175,7 +175,7 @@ mod tests {
         for (i, (calc_char, exp_char)) in pi_chars.iter().zip(expected_chars.iter()).enumerate() {
             assert_eq!(
                 calc_char, exp_char,
-                "{}桁目が一致しません: 計算値='{}', 期待値='{}'",
+                "{}桁目が一致しません: found '{}', expected '{}'",
                 i, calc_char, exp_char
             );
         }
