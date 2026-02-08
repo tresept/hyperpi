@@ -78,9 +78,7 @@ fn main() -> std::io::Result<()> {
     eprintln!("計算を {:.3}s で完了しました", calc_time.as_secs_f64());
 
     // 10進数文字列に変換
-    let (pi_str, conv_time) = convert_to_decimal_string(&pi_bin, digits, precision);
-    eprintln!("変換を {:.3}s で完了しました", conv_time.as_secs_f64());
-    eprintln!("合計時間: {:.3}s\n", (calc_time + conv_time).as_secs_f64());
+    let (pi_str, _) = convert_to_decimal_string(&pi_bin, digits, precision);
 
     // ファイルに保存
     let start_io = Instant::now();
@@ -90,6 +88,11 @@ fn main() -> std::io::Result<()> {
     eprintln!(
         "ファイル書き込みを {:.3}s で完了しました",
         start_io.elapsed().as_secs_f64()
+    );
+
+    eprintln!(
+        "合計 {:.3}s で完了しました",
+        (calc_time + start_io.elapsed()).as_secs_f64()
     );
 
     Ok(())
@@ -139,6 +142,10 @@ fn convert_to_decimal_string(
 fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
     let start = Instant::now();
 
+    // 2次収束なので log2(precision) 回繰り返せば十分
+    let iterations = ((precision as f64).log2().ceil() as u32).max(10);
+    eprintln!("{} 回のループとなります", iterations);
+
     // 初期値を設定
     let one = BinFloat::ONE.with_precision(precision).value();
     let two = BinFloat::from(2u8).with_precision(precision).value();
@@ -153,9 +160,6 @@ fn calculate_pi(precision: usize) -> (BinFloat, Duration) {
         "初期値の計算が完了しました: {:.3}s",
         start.elapsed().as_secs_f64()
     );
-
-    // 2次収束なので log2(precision) 回繰り返せば十分
-    let iterations = ((precision as f64).log2().ceil() as u32).max(10);
 
     for i in 0..iterations {
         let a_next = ((&a + &b) / &two).with_precision(precision).value();
