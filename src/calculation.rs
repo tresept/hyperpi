@@ -136,6 +136,49 @@ where
     (pi, start.elapsed())
 }
 
+struct PQR {
+    p: IBig,
+    q: IBig,
+    r: IBig,
+}
+
+fn bs(a: i64, b: i64, c3: &IBig) -> PQR {
+    if b - a == 1 {
+        let k = IBig::from(a);
+        let a_val = IBig::from(13591409);
+        let b_val = IBig::from(545140134);
+
+        if a == 0 {
+            // 第0項はシンプルに A / 1
+            return PQR {
+                p: IBig::from(1),
+                q: a_val,
+                r: IBig::from(1),
+            };
+        }
+
+        // 第1項以降のパーツ (P/R が比率を表す)
+        // 係数を整理すると、この形が一番整数計算しやすいです
+        let p: IBig =
+            (IBig::from(6) * &k - 5) * (IBig::from(2) * &k - 1) * (IBig::from(6) * &k - 1) * -1;
+        let r = k.pow(3) * c3 / 24; // Chudnovskyの公式を整数用に整理した形
+        let q = &p * (a_val + b_val * &k);
+
+        PQR { p, q, r }
+    } else {
+        let m = (a + b) / 2;
+        let left = bs(a, m, c3);
+        let right = bs(m, b, c3);
+
+        // 合体ルール！
+        PQR {
+            q: &left.q * &right.r + &left.p * &right.q,
+            p: &left.p * &right.p,
+            r: &left.r * &right.r,
+        }
+    }
+}
+
 /// Chudnovsky法で円周率を計算
 /// * digits: 求めたい10進数の桁数
 /// * precision: 内部計算に使う2進数の精度（ビット数）
@@ -143,43 +186,16 @@ pub fn calc_chudnovsky(digits: usize, precision: usize) -> BinFloat {
     // 必要な項数
     let n = digits / 14 + 1;
 
-    let a = IBig::from(13591409);
-    let b = IBig::from(545140134);
+    // let a = IBig::from(13591409);
+    // let b = IBig::from(545140134);
     let c = IBig::from(640320);
     let c3 = &c * &c * &c;
 
-    let mut sum_num = IBig::from(0);
-    let mut sum_den = IBig::from(1);
-
-    // 符号・階乗・分母をひとまとめにした重み
-    // 差分計算による漸化式で更新していく
-    let mut m_num = IBig::from(1);
-    let mut m_den = IBig::from(1);
-
-    for k in 0..n {
-        let k_big = IBig::from(k);
-
-        // 定義通りの T_k を、m と (A + Bk) の掛け算で再現
-        let tk_num = &m_num * (&a + &b * &k_big);
-        let tk_den = &m_den;
-
-        // 次の項(k+1)のために m を更新
-        // これが漸化式（差分更新）の核
-        let r_num = (IBig::from(12) * &k_big + 2)
-            * (IBig::from(12) * &k_big + 6)
-            * (IBig::from(12) * &k_big + 10);
-        let r_den = (IBig::from(k + 1).pow(3)) * (-&c3);
-
-        sum_num = &sum_num * tk_den + tk_num * &sum_den;
-        sum_den = &sum_den * tk_den;
-
-        m_num *= r_num;
-        m_den *= r_den;
-    }
+    let res = bs(0, n as i64, &c3);
 
     // 高精度な浮動小数点数に変換
-    let sum_num_float = BinFloat::from(sum_num).with_precision(precision).value();
-    let sum_den_float = BinFloat::from(sum_den).with_precision(precision).value();
+    let sum_num_float = BinFloat::from(res.q).with_precision(precision).value();
+    let sum_den_float = BinFloat::from(res.r).with_precision(precision).value();
     let c_float = BinFloat::from(c.clone()).with_precision(precision).value();
 
     // 高精度な √C を求める
@@ -274,7 +290,7 @@ mod tests {
         // cargo test test_chudnovsky_self -- --nocapture で実行
 
         // 計算桁数
-        let digits = 1000;
+        let digits = 1000000;
 
         // 2進数ビットあたり精度
         let precision = (digits as f64 * 3.32 * 1.5) as usize;
@@ -287,10 +303,10 @@ mod tests {
         let (pi_str, convert_time) = convert_to_decimal_string(&pi, digits, precision);
         let total_time = start.elapsed();
 
+        // println!("\nπ = {}", pi_str);
+
         println!("\n計算時間: {:?}", total_time - convert_time);
         println!("変換時間: {:?}", convert_time);
         println!("合計時間: {:?}", total_time);
-
-        println!("\nπ = {}", pi_str);
     }
 }
