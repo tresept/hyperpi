@@ -2,8 +2,24 @@ use dashu::base::SquareRoot;
 use dashu::float::{FBig, round::mode::HalfEven};
 use dashu::integer::IBig;
 
+use std::time::{Duration, Instant};
+
 type BinFloat = FBig<HalfEven, 2>;
 
+/// Chudnovsky法のプログレス情報
+#[derive(Debug, Clone)]
+pub struct ChudnovskyProgress {
+    /// 計算開始からの経過時間
+    pub elapsed: Duration,
+    /// 推定確定桁数
+    pub estimated_digits: usize,
+    /// 現在処理中の k 範囲 [a, b)
+    pub range: (i64, i64),
+    /// 追加のカスタムメッセージ
+    pub message: Option<String>,
+}
+
+// 分割統治法でChudnovskyの各項を計算するための構造体
 struct Pqr {
     p: IBig,
     q: IBig,
