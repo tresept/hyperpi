@@ -10,6 +10,9 @@ use sysinfo::System;
 mod gauss_legendre;
 use gauss_legendre::{GaussLegendreProgress, calc_gauss_legendre};
 
+#[allow(unused_imports)]
+mod chudnovsky;
+
 mod convert;
 use convert::convert_to_decimal_string;
 

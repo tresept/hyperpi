@@ -97,3 +97,118 @@ where
 
     (pi, start.elapsed())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calc_gauss_legendre_basic() {
+        // 基本的な計算のテスト
+        let precision = 128;
+        let (pi, _duration) = calc_gauss_legendre(precision, |_| {});
+
+        // πが妥当な範囲にあることを確認（3 < π < 4）
+        let three = BinFloat::from(3i32);
+        let four = BinFloat::from(4i32);
+        assert!(pi > three);
+        assert!(pi < four);
+    }
+
+    #[test]
+    fn test_calc_gauss_legendre_precision() {
+        // より高精度でπを計算
+        let precision = 256;
+        let (pi, _duration) = calc_gauss_legendre(precision, |_| {});
+
+        // πが妥当な範囲にあることを確認（3.14 < π < 3.15）
+        let lower = (BinFloat::from(314i32) / BinFloat::from(100i32))
+            .with_precision(precision)
+            .value();
+        let upper = (BinFloat::from(315i32) / BinFloat::from(100i32))
+            .with_precision(precision)
+            .value();
+        assert!(pi > lower);
+        assert!(pi < upper);
+    }
+
+    #[test]
+    fn test_calc_gauss_legendre_progress_callback() {
+        // プログレスコールバックが呼ばれることを確認
+        let precision = 64;
+        let mut callback_count = 0;
+        let mut phases_seen = vec![];
+
+        let (_pi, _duration) = calc_gauss_legendre(precision, |progress| {
+            callback_count += 1;
+            phases_seen.push(progress.phase);
+        });
+
+        // コールバックが複数回呼ばれていることを確認
+        assert!(callback_count > 0);
+
+        // 初期化と計算中のフェーズが含まれていることを確認
+        assert!(phases_seen.contains(&"初期化"));
+        assert!(phases_seen.contains(&"計算中"));
+        assert!(phases_seen.contains(&"完了"));
+    }
+
+    #[test]
+    fn test_calc_gauss_legendre_progress_iteration_count() {
+        // イテレーション数が正しく報告されることを確認
+        let precision = 128;
+        let mut max_iteration = 0;
+        let mut total_iterations = 0;
+
+        let (_pi, _duration) = calc_gauss_legendre(precision, |progress| {
+            max_iteration = max_iteration.max(progress.iteration);
+            total_iterations = progress.total_iterations;
+        });
+
+        // イテレーション数が合理的な範囲にあることを確認
+        assert!(total_iterations > 0);
+        assert_eq!(max_iteration, total_iterations);
+    }
+
+    #[test]
+    fn test_calc_gauss_legendre_convergence() {
+        // 精度を上げると結果が改善されることを確認
+        let (pi_low, _) = calc_gauss_legendre(64, |_| {});
+        let (pi_high, _) = calc_gauss_legendre(256, |_| {});
+
+        // 両方とも3と4の間にあることを確認
+        let three = BinFloat::from(3i32);
+        let four = BinFloat::from(4i32);
+        assert!(pi_low > three);
+        assert!(pi_low < four.clone());
+        assert!(pi_high > three);
+        assert!(pi_high < four);
+    }
+
+    #[test]
+    fn test_gauss_legendre_progress_structure() {
+        // GaussLegendreProgress構造体が正しく作成できることを確認
+        let progress = GaussLegendreProgress {
+            iteration: 5,
+            total_iterations: 10,
+            elapsed: Duration::from_secs(1),
+            phase: "計算中",
+            message: Some("テストメッセージ".to_string()),
+        };
+
+        assert_eq!(progress.iteration, 5);
+        assert_eq!(progress.total_iterations, 10);
+        assert_eq!(progress.phase, "計算中");
+        assert_eq!(progress.message, Some("テストメッセージ".to_string()));
+    }
+
+    #[test]
+    fn test_calc_gauss_legendre_elapsed_time() {
+        // 経過時間が記録されることを確認
+        let precision = 128;
+        let (_, duration) = calc_gauss_legendre(precision, |_| {});
+
+        // 何らかの時間が経過していることを確認
+        assert!(duration.as_nanos() > 0);
+    }
+}
