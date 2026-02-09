@@ -2,6 +2,8 @@ use dashu::base::SquareRoot;
 use dashu::float::{FBig, round::mode::HalfEven};
 use dashu::integer::IBig;
 
+use rayon::prelude::*;
+
 use std::time::{Duration, Instant};
 
 type BinFloat = FBig<HalfEven, 2>;
@@ -91,55 +93,23 @@ where
 }
 
 /// 分割統治法でChudnovskyの各項を計算（プログレス付き）
-fn bs_with_progress<F>(a: i64, b: i64, c3: &IBig, collector: &mut ProgressCollector<'_, F>) -> Pqr
-where
-    F: FnMut(ChudnovskyProgress),
-{
+fn bs_parallel(
+    a: i64,
+    b: i64,
+    c3: &IBig,
+    sender: Option<&std::sync::mpsc::Sender<(Option<i64>, Option<i64>)>>,
+) -> Pqr {
+    // 小区間なら直列で処理（オーバーヘッドを避ける）
     if b - a == 1 {
         let k = IBig::from(a);
         let a_val = IBig::from(13591409);
         let b_val = IBig::from(545140134);
 
         if a == 0 {
-            let pqr = Pqr {
-                p: IBig::from(1),
-                q: a_val,
-                r: IBig::from(1),
-            };
-            collector.leaf_done((Some(a), Some(b)));
-            return pqr;
-        }
-
-        let p: IBig =
-            (IBig::from(6) * &k - 5) * (IBig::from(2) * &k - 1) * (IBig::from(6) * &k - 1) * -1;
-        let r = k.pow(3) * c3 / 24;
-        let q = &p * (a_val + b_val * &k);
-
-        let pqr = Pqr { p, q, r };
-        collector.leaf_done((Some(a), Some(b)));
-        pqr
-    } else {
-        let m = (a + b) / 2;
-        let left = bs_with_progress(a, m, c3, collector);
-        let right = bs_with_progress(m, b, c3, collector);
-
-        // 合体ルール！
-        Pqr {
-            q: &left.q * &right.r + &left.p * &right.q,
-            p: &left.p * &right.p,
-            r: &left.r * &right.r,
-        }
-    }
-}
-
-/// 分割統治法でChudnovskyの各項を計算（テスト用、プログレスなし）
-fn bs(a: i64, b: i64, c3: &IBig) -> Pqr {
-    if b - a == 1 {
-        let k = IBig::from(a);
-        let a_val = IBig::from(13591409);
-        let b_val = IBig::from(545140134);
-
-        if a == 0 {
+            if let Some(s) = sender {
+                // 失敗しても無視（受信側がいなくても問題ない）
+                let _ = s.send((Some(a), Some(b)));
+            }
             return Pqr {
                 p: IBig::from(1),
                 q: a_val,
@@ -152,11 +122,31 @@ fn bs(a: i64, b: i64, c3: &IBig) -> Pqr {
         let r = k.pow(3) * c3 / 24;
         let q = &p * (a_val + b_val * &k);
 
+        if let Some(s) = sender {
+            let _ = s.send((Some(a), Some(b)));
+        }
+
         Pqr { p, q, r }
     } else {
+        // 並列化のしきい値（環境に応じて調整）
+        if b - a < 500 {
+            let m = (a + b) / 2;
+            let left = bs_parallel(a, m, c3, sender);
+            let right = bs_parallel(m, b, c3, sender);
+
+            return Pqr {
+                q: &left.q * &right.r + &left.p * &right.q,
+                p: &left.p * &right.p,
+                r: &left.r * &right.r,
+            };
+        }
+
         let m = (a + b) / 2;
-        let left = bs(a, m, c3);
-        let right = bs(m, b, c3);
+        // 左右を並列に計算
+        let (left, right) = rayon::join(
+            || bs_parallel(a, m, c3, sender),
+            || bs_parallel(m, b, c3, sender),
+        );
 
         Pqr {
             q: &left.q * &right.r + &left.p * &right.q,
@@ -165,6 +155,9 @@ fn bs(a: i64, b: i64, c3: &IBig) -> Pqr {
         }
     }
 }
+
+// Serial `bs` removed — please use `bs_parallel(a, b, c3, sender_option)`.
+// For tests/one-thread usage, pass `None` as the sender.
 
 /// Chudnovsky法で円周率を計算
 /// * digits: 求めたい10進数の桁数
@@ -193,12 +186,31 @@ where
     let c = IBig::from(640320);
     let c3 = &c * &c * &c;
 
-    // Binary Splitting（プログレス付き）
+    // Binary Splitting（チャネル経由でプログレスを受け取りつつ並列実行）
     let res = {
+        // メインスレッドが受信してコールバックを呼ぶ方式：
+        // ワーカースレッド内で `bs_parallel` を実行し、葉完了ごとにチャネルへ送る。
+        use std::sync::mpsc;
+        let (sender, receiver) = mpsc::channel::<(Option<i64>, Option<i64>)>();
+
+        // bs_parallel は sender を受け取り、葉が完了するたびに送信する
+        let c3_for_thread = c3.clone();
+        let handle = std::thread::spawn(move || {
+            let result = bs_parallel(0, n as i64, &c3_for_thread, Some(&sender));
+            // 送信者をドロップして受信側の iterator を終了させる
+            drop(sender);
+            result
+        });
+
+        // メインスレッド側でチャネルを受信してコールバックを呼ぶ
         let mut collector = ProgressCollector::new(n, &mut on_progress, 100);
-        let res = bs_with_progress(0, n as i64, &c3, &mut collector);
+        for range in receiver {
+            collector.leaf_done(range);
+        }
         collector.final_report();
-        res
+
+        // ワーカースレッドの結果を取得
+        handle.join().expect("worker thread panicked")
     };
     // ↑ ブロックを抜けると collector が drop され、on_progress の借用が解放される
 
@@ -239,7 +251,7 @@ mod tests {
     #[test]
     fn test_bs_first_term() {
         let c3 = IBig::from(640320) * IBig::from(640320) * IBig::from(640320);
-        let result = bs(0, 1, &c3);
+        let result = bs_parallel(0, 1, &c3, None);
 
         assert_eq!(result.p, IBig::from(1));
         assert_eq!(result.q, IBig::from(13591409));
@@ -249,7 +261,7 @@ mod tests {
     #[test]
     fn test_bs_second_term() {
         let c3 = IBig::from(640320) * IBig::from(640320) * IBig::from(640320);
-        let result = bs(1, 2, &c3);
+        let result = bs_parallel(1, 2, &c3, None);
 
         assert_eq!(result.p, IBig::from(-5));
         assert!(result.r > IBig::from(0));
