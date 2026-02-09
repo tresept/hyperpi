@@ -7,11 +7,11 @@ use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
-mod gauss_legendre;
-use gauss_legendre::{GaussLegendreProgress, calc_gauss_legendre};
-
 #[allow(unused_imports)]
+mod gauss_legendre;
+
 mod chudnovsky;
+use chudnovsky::{ChudnovskyProgress, calc_chudnovsky};
 
 mod convert;
 use convert::convert_to_decimal_string;
@@ -140,28 +140,13 @@ fn main() -> std::io::Result<()> {
             .tick_chars("▖▗▘▙▚▛▜▝▞▟"),
     );
 
-    // 円周率を計算（2進数）
-    let (pi_bin, calc_time) =
-        calc_gauss_legendre(precision, |info: GaussLegendreProgress| match info.phase {
-            "初期化" => {
-                if let Some(msg) = info.message {
-                    eprintln!("{}", msg);
-                }
-                spinner.set_message("初期値を計算中...");
+    // 円周率を計算（2進数）— Chudnovsky法
+    let (pi_bin, calc_time) = calc_chudnovsky(digits, precision, |info: ChudnovskyProgress| {
+        match info.message.as_deref() {
+            Some("初期化") => {
+                spinner.set_message("初期化中...");
             }
-            "計算中" => {
-                if let Some(msg) = &info.message {
-                    spinner.set_message(msg.clone());
-                } else {
-                    let progress_pct =
-                        (info.iteration as f64 / info.total_iterations as f64) * 100.0;
-                    spinner.set_message(format!(
-                        "Gauss-Legendre法: {}/{} 回 ({:.1}%)",
-                        info.iteration, info.total_iterations, progress_pct
-                    ));
-                }
-            }
-            "完了" => {
+            Some("完了") => {
                 spinner.set_style(
                     ProgressStyle::default_spinner()
                         .template("✓ [{elapsed_precise}] {msg}")
@@ -170,8 +155,15 @@ fn main() -> std::io::Result<()> {
                 spinner
                     .finish_with_message(format!("計算完了: {:.3}s", info.elapsed.as_secs_f64()));
             }
-            _ => {}
-        });
+            _ => {
+                // Binary Splitting の進捗（leaf_done からのコールバック）
+                spinner.set_message(format!(
+                    "Chudnovsky法: 推定 {} 桁確定",
+                    info.estimated_digits
+                ));
+            }
+        }
+    });
     eprintln!();
 
     // 10進数文字列に変換（スピナーなし、時間だけ表示）
