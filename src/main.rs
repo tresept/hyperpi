@@ -7,8 +7,11 @@ use std::io::{BufWriter, Error, ErrorKind, Write};
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
-mod calculation;
-use calculation::{GaussLegendreProgress, calc_gauss_legendre, convert_to_decimal_string};
+mod gauss_legendre;
+use gauss_legendre::{GaussLegendreProgress, calc_gauss_legendre};
+
+mod convert;
+use convert::convert_to_decimal_string;
 
 macro_rules! hex_color {
     ($hex:expr) => {{
