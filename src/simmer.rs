@@ -21,8 +21,10 @@ struct ShimmerConfig {
     spinner_color: Color,
     /// ハイライト幅（文字数）
     highlight_width: usize,
-    /// フレーム間隔
-    frame_duration: Duration,
+    /// シマーの更新間隔
+    shimmer_duration: Duration,
+    /// スピナーの更新間隔
+    spinner_duration: Duration,
 }
 
 impl Default for ShimmerConfig {
@@ -44,7 +46,8 @@ impl Default for ShimmerConfig {
                 b: 255,
             },
             highlight_width: 4,
-            frame_duration: Duration::from_millis(80),
+            shimmer_duration: Duration::from_millis(80),
+            spinner_duration: Duration::from_millis(100),
         }
     }
 }
@@ -196,16 +199,31 @@ pub fn start_shimmer(initial_text: String) -> Sender<String> {
         let mut spinner_frame: usize = 0;
         let mut last_text = initial;
         let start_time = Instant::now();
+        let mut last_shimmer_update = Instant::now();
+        let mut last_spinner_update = Instant::now();
 
         loop {
-            // 1フレーム描画
+            // 現在時刻を取得
+            let now = Instant::now();
             let elapsed = start_time.elapsed();
-            let _ = render_frame(&last_text, shimmer_offset, spinner_frame, elapsed, &config);
-            shimmer_offset = shimmer_offset.wrapping_add(1);
-            spinner_frame = spinner_frame.wrapping_add(1);
 
-            // 次のメッセージが来るまで frame_duration を待つ
-            match rx.recv_timeout(config.frame_duration) {
+            // シマーの更新タイミング
+            if now.duration_since(last_shimmer_update) >= config.shimmer_duration {
+                shimmer_offset = shimmer_offset.wrapping_add(1);
+                last_shimmer_update = now;
+            }
+
+            // スピナーの更新タイミング
+            if now.duration_since(last_spinner_update) >= config.spinner_duration {
+                spinner_frame = spinner_frame.wrapping_add(1);
+                last_spinner_update = now;
+            }
+
+            // 1フレーム描画
+            let _ = render_frame(&last_text, shimmer_offset, spinner_frame, elapsed, &config);
+
+            // 次のメッセージをチェック（短い間隔で待機）
+            match rx.recv_timeout(Duration::from_millis(16)) {
                 Ok(msg) => {
                     // 受信したら表示テキストを更新し即座に次フレームへ
                     last_text = msg;
