@@ -1,7 +1,8 @@
 use colorgrad::Gradient;
-use indicatif::{ProgressBar, ProgressStyle};
+use inquire::{Confirm, CustomType, InquireError, Select};
 use owo_colors::OwoColorize;
 use std::time::Duration;
+use strum::IntoEnumIterator;
 
 #[macro_export]
 macro_rules! hex_color {
@@ -49,8 +50,7 @@ pub fn gradient_text(text: String) -> String {
     text.lines()
         .map(gradient_line)
         .collect::<Vec<String>>()
-        .join("
-")
+        .join("\n")
 }
 
 /// アプリケーションのロゴを返す
@@ -62,33 +62,131 @@ pub fn logo() -> &'static str {
 "#
 }
 
-/// 計算用の標準的なスピナーを作成する
-pub fn create_spinner(message: &str, color_cyan: bool) -> ProgressBar {
-    let spinner = ProgressBar::new_spinner();
-    spinner.enable_steady_tick(Duration::from_millis(200));
-    
-    let template = if color_cyan {
-        "{spinner:.cyan} [{elapsed_precise}] {msg}"
-    } else {
-        "{spinner:.green} [{elapsed_precise}] {msg}"
-    };
-
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template(template)
-            .unwrap()
-            .tick_chars("▖▗▘▙▚▛▜▝▞▟"),
+/// ウェルカムメッセージを表示する
+pub fn print_welcome(version: &str) {
+    eprintln!("{}", gradient_text(logo().to_string()).bold());
+    eprintln!(
+        "{}",
+        format!("Welcome to HyperPi v{}\n", version)
+            .color(crate::hex_color!("#326095"))
+            .bold()
     );
-    spinner.set_message(message.to_string());
-    spinner
 }
 
-/// スピナーを完了状態にする
-pub fn finish_spinner(spinner: &ProgressBar, message: String) {
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("✓ [{elapsed_precise}] {msg}")
-            .unwrap(),
-    );
-    spinner.finish_with_message(message);
+/// 桁数の入力を促す
+pub fn prompt_digits() -> miette::Result<Option<usize>> {
+    let result = CustomType::<usize>::new(
+        &"Enter the number of decimal places to calculate"
+            .truecolor(255, 246, 129)
+            .to_string(),
+    )
+    .with_default(1_048_576)
+    .prompt();
+
+    match result {
+        Ok(val) => Ok(Some(val)),
+        Err(InquireError::OperationCanceled) | Err(InquireError::OperationInterrupted) => {
+            eprintln!("\n{}", "Cancelled".bright_black().italic());
+            Ok(None)
+        }
+        Err(err) => Err(miette::miette!(err)),
+    }
 }
+
+/// アルゴリズムの選択を促す
+pub fn prompt_algorithm<T: IntoEnumIterator + std::fmt::Display + PartialEq>() -> miette::Result<Option<T>> {
+    let prompt_msg = "Select the algorithm to calculate Pi"
+        .truecolor(135, 206, 250)
+        .to_string();
+
+    let options = T::iter().collect::<Vec<_>>();
+
+    match Select::new(&prompt_msg, options)
+        .with_help_message("Pick one of the algorithms to calculate Pi...")
+        .prompt()
+    {
+        Ok(v) => Ok(Some(v)),
+        Err(InquireError::OperationCanceled) | Err(InquireError::OperationInterrupted) => {
+            eprintln!("\n{}", "Cancelled".bright_black().italic());
+            Ok(None)
+        }
+        Err(err) => Err(miette::miette!(err)),
+    }
+}
+
+/// 最終確認を促す
+pub fn confirm_calculation(digits: usize) -> miette::Result<bool> {
+    let result = Confirm::new(
+        &format!("Calculate {} digits of Pi. Are you serious???", digits)
+            .truecolor(220, 79, 109)
+            .to_string(),
+    )
+    .with_default(true)
+    .prompt();
+
+    match result {
+        Ok(true) => Ok(true),
+        Ok(false) => {
+            println!("{}", "The system was aborted".bright_black());
+            Ok(false)
+        }
+        Err(InquireError::OperationCanceled) | Err(InquireError::OperationInterrupted) => {
+            println!("\n{}", "Operation Interrupted".bright_black().italic());
+            Ok(false)
+        }
+        Err(err) => Err(miette::miette!(err)),
+    }
+}
+
+/// 計算結果の統計情報を表示する
+pub struct Stats {
+    pub algorithm: String,
+    pub total_time: Duration,
+    pub calc_time: Duration,
+    pub conversion_time: Duration,
+    pub io_time: Duration,
+    pub hash: String,
+}
+
+pub fn print_stats(stats: Stats) {
+    let label_width = 22;
+
+    eprintln!(
+        "{:<width$} {}",
+        "Algorithm:".bright_black(),
+        stats.algorithm.cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "Total time:".bright_black(),
+        stats.total_time.as_secs_f64().cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "Calculation time:".bright_black(),
+        stats.calc_time.as_secs_f64().cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "Conversion time:".bright_black(),
+        stats.conversion_time.as_secs_f64().cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "IO time:".bright_black(),
+        stats.io_time.as_secs_f64().cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {}{}",
+        "Result SHA-256 hash:".bright_black(),
+        stats.hash.chars().take(16).collect::<String>().cyan(),
+        "...".cyan(),
+        width = label_width
+    );
+}
+
