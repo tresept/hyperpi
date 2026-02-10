@@ -119,15 +119,6 @@ fn main() -> std::io::Result<()> {
     let precision = (digits as f64 * 10.0_f64.log2() + 128.0) as usize;
 
     eprintln!("ただいまより {} 桁の円周率を計算します\n", digits);
-    eprintln!("ハードウェア情報:  ");
-    eprintln!(
-        "  合計メモリ: {:.2} GiB",
-        (total_memory as f64 / 1024.0 / 1024.0 / 1024.0)
-    );
-    eprintln!(
-        "  利用可能メモリ: {:.2} GiB",
-        (available_memory as f64 / 1024.0 / 1024.0 / 1024.0)
-    );
 
     // 計算用スピナー
     let spinner = ProgressBar::new_spinner();
