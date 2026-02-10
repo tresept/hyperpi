@@ -3,15 +3,17 @@ use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{Confirm, CustomType, InquireError};
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use std::fs::File;
-use std::io::{BufWriter, Error, ErrorKind, Write, copy};
+use std::io::{BufWriter, Write, copy};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
 #[allow(unused_imports)]
 mod gauss_legendre;
+#[allow(unused_imports)]
+use gauss_legendre::{GaussLegendreProgress, calc_gauss_legendre};
 
 mod chudnovsky;
 use chudnovsky::{ChudnovskyProgress, calc_chudnovsky};
@@ -83,7 +85,7 @@ fn check_hash(path: PathBuf) -> Result<String, miette::Error> {
         .map_err(|e| miette::miette!(format!("Failed to open file {}: {}", path.display(), e)))?;
     let mut reader = std::io::BufReader::new(file);
     let mut hasher = sha2::Sha256::new();
-    copy(&mut reader, &mut hasher)
+    let _ = copy(&mut reader, &mut hasher)
         .into_diagnostic()
         .map_err(|e| miette::miette!(format!("Error: {}", e)));
     let result_hash = hasher.finalize();
