@@ -21,7 +21,10 @@ mod convert;
 use convert::convert_to_decimal_string;
 
 mod cli;
-use cli::{create_spinner, finish_spinner, gradient_text, logo};
+use cli::{gradient_text, logo};
+
+mod simmer;
+use simmer::{finish_shimmer, start_shimmer};
 
 /// ファイルのSHA-256ハッシュを計算する
 fn check_hash(path: PathBuf) -> Result<String, miette::Error> {
@@ -137,52 +140,73 @@ fn main() -> miette::Result<()> {
     let (pi_bin, calc_time) = match target {
         Algorithm::Chudnovsky => {
             eprintln!("Calculation method: {}", "Chudnovsky Algorithm".cyan());
-            let spinner = create_spinner("Initializing...", true);
+            // シマー統合スピナー開始
+            let shimmer = start_shimmer("Initializing...".to_string());
+
             // pi_bin, calc_timeを返す
-            calc_chudnovsky(digits, precision, |info: ChudnovskyProgress| {
+            let result = calc_chudnovsky(digits, precision, |info: ChudnovskyProgress| {
                 match info.message.as_deref() {
-                        Some("初期化") => spinner.set_message("Initializing..."),
-                        Some("完了") => finish_spinner(
-                            &spinner,
-                            format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()),
-                        ),
-                        _ => spinner.set_message(format!(
-                            "Chudnovsky Algorithm: Estimated {} digits confirmed -> Processing range [{}, {})",
+                    Some("初期化") => {
+                        shimmer.send("Initializing...".to_string()).ok();
+                    }
+                    Some("完了") => {
+                        // 完了メッセージは後で finish_shimmer で表示
+                    }
+                    _ => {
+                        let msg = format!(
+                            "Chudnovsky: {} digits → range [{}, {})",
                             info.estimated_digits,
                             info.range.0.map_or(0, |v| v),
                             info.range.1.map_or(0, |v| v),
-                        )),
+                        );
+                        shimmer.send(msg).ok();
                     }
-            })
+                }
+            });
+
+            // シマー停止＋完了メッセージ表示
+            finish_shimmer(
+                shimmer,
+                format!("Calculated: {:.3}s", result.1.as_secs_f64()),
+            );
+
+            result
         }
         Algorithm::GaussLegendre => {
             eprintln!("Calculation method: {}", "Gauss-legendre Algorithm".cyan());
-            let spinner = create_spinner("Calculating Pi using Gauss-Legendre Algorithm...", true);
+            let shimmer = start_shimmer("Calculating Pi using Gauss-Legendre...".to_string());
+
             // pi_bin, calc_timeを返す
-            calc_gauss_legendre(precision, |info: GaussLegendreProgress| {
+            let result = calc_gauss_legendre(precision, |info: GaussLegendreProgress| {
                 if info.iteration == info.total_iterations {
-                    finish_spinner(
-                        &spinner,
-                        format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()),
-                    );
+                    // 完了メッセージは後で finish_shimmer で表示
                 } else {
-                    spinner.set_message(format!(
-                        "Gauss-Legendre Algorithm: Iteration {}/{} - {}",
+                    let msg = format!(
+                        "Gauss-Legendre: Iteration {}/{} - {}",
                         info.iteration, info.total_iterations, info.phase,
-                    ));
+                    );
+                    shimmer.send(msg).ok();
                 }
-            })
+            });
+
+            // シマー停止＋完了メッセージ表示
+            finish_shimmer(
+                shimmer,
+                format!("Calculated: {:.3}s", result.1.as_secs_f64()),
+            );
+
+            result
         }
     };
     eprintln!();
 
     // 10進数文字列への変換
-    let spinner = create_spinner("Converting to decimal string...", false);
+    let shimmer = start_shimmer("Converting to decimal string...".to_string());
 
     let (pi_str, conversion_time) = convert_to_decimal_string(&pi_bin, digits, precision);
 
-    finish_spinner(
-        &spinner,
+    finish_shimmer(
+        shimmer,
         format!(
             "Decimal conversion complete: {:.3}s",
             conversion_time.as_secs_f64()

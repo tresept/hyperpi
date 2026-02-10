@@ -35,7 +35,7 @@ where
         iteration: 0,
         total_iterations: iterations,
         elapsed: start.elapsed(),
-        phase: "初期化",
+        phase: "Initializing...",
     });
 
     // 初期値を設定
@@ -52,7 +52,7 @@ where
         iteration: 0,
         total_iterations: iterations,
         elapsed: start.elapsed(),
-        phase: "計算中",
+        phase: "Calculating...",
     });
 
     for i in 0..iterations {
@@ -70,7 +70,7 @@ where
             iteration: i + 1,
             total_iterations: iterations,
             elapsed: start.elapsed(),
-            phase: "計算中",
+            phase: "Calculating...",
         });
     }
 
@@ -86,7 +86,7 @@ where
         iteration: iterations,
         total_iterations: iterations,
         elapsed: start.elapsed(),
-        phase: "完了",
+        phase: "Completed",
     });
 
     (pi, start.elapsed())
@@ -142,9 +142,9 @@ mod tests {
         assert!(callback_count > 0);
 
         // 初期化と計算中のフェーズが含まれていることを確認
-        assert!(phases_seen.contains(&"初期化"));
-        assert!(phases_seen.contains(&"計算中"));
-        assert!(phases_seen.contains(&"完了"));
+        assert!(phases_seen.contains(&"Initializing..."));
+        assert!(phases_seen.contains(&"Calculating..."));
+        assert!(phases_seen.contains(&"Completed"));
     }
 
     #[test]
@@ -186,12 +186,12 @@ mod tests {
             iteration: 5,
             total_iterations: 10,
             elapsed: Duration::from_secs(1),
-            phase: "計算中",
+            phase: "Calculating...",
         };
 
         assert_eq!(progress.iteration, 5);
         assert_eq!(progress.total_iterations, 10);
-        assert_eq!(progress.phase, "計算中");
+        assert_eq!(progress.phase, "Calculating...");
     }
 
     #[test]

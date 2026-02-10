@@ -474,6 +474,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "colorgrad",
+ "crossterm",
  "dashu",
  "indicatif",
  "inquire",

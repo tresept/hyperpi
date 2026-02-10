@@ -181,7 +181,7 @@ where
         elapsed: start.elapsed(),
         estimated_digits: 0,
         range: (None, None),
-        message: Some("初期化".to_string()),
+        message: Some("Initializing...".to_string()),
     });
 
     // 必要な項数を算出 (1項あたり約14.18桁)
@@ -236,7 +236,7 @@ where
         elapsed: start.elapsed(),
         estimated_digits: n * 14,
         range: (Some(0), Some(n as i64)),
-        message: Some("完了".to_string()),
+        message: Some("Completed".to_string()),
     });
 
     (pi, start.elapsed())
@@ -325,8 +325,8 @@ mod tests {
         });
 
         // 初期化と完了のメッセージが含まれていることを確認
-        assert!(messages_seen.contains(&"初期化".to_string()));
-        assert!(messages_seen.contains(&"完了".to_string()));
+        assert!(messages_seen.contains(&"Initializing...".to_string()));
+        assert!(messages_seen.contains(&"Completed".to_string()));
     }
 
     #[test]
