@@ -5,7 +5,7 @@ use sha2::Digest;
 use std::fs::File;
 use std::io::{BufWriter, Write, copy};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use strum::{Display, EnumIter, IntoEnumIterator};
 use sysinfo::System;
 

@@ -16,8 +16,6 @@ pub struct GaussLegendreProgress {
     pub elapsed: Duration,
     /// 現在のフェーズ（"初期化", "計算中", "完了"など）
     pub phase: &'static str,
-    /// 追加のカスタムメッセージ
-    pub message: Option<String>,
 }
 
 /// Gauss-Legendre法で円周率を計算
@@ -38,7 +36,6 @@ where
         total_iterations: iterations,
         elapsed: start.elapsed(),
         phase: "初期化",
-        message: None,
     });
 
     // 初期値を設定
@@ -56,7 +53,6 @@ where
         total_iterations: iterations,
         elapsed: start.elapsed(),
         phase: "計算中",
-        message: Some("初期値の計算が完了しました".to_string()),
     });
 
     for i in 0..iterations {
@@ -75,7 +71,6 @@ where
             total_iterations: iterations,
             elapsed: start.elapsed(),
             phase: "計算中",
-            message: None,
         });
     }
 
@@ -92,7 +87,6 @@ where
         total_iterations: iterations,
         elapsed: start.elapsed(),
         phase: "完了",
-        message: None,
     });
 
     (pi, start.elapsed())
@@ -193,13 +187,11 @@ mod tests {
             total_iterations: 10,
             elapsed: Duration::from_secs(1),
             phase: "計算中",
-            message: Some("テストメッセージ".to_string()),
         };
 
         assert_eq!(progress.iteration, 5);
         assert_eq!(progress.total_iterations, 10);
         assert_eq!(progress.phase, "計算中");
-        assert_eq!(progress.message, Some("テストメッセージ".to_string()));
     }
 
     #[test]
