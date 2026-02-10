@@ -1,6 +1,7 @@
 use colorgrad::Gradient;
 use indicatif::{ProgressBar, ProgressStyle};
-use inquire::{Confirm, CustomType};
+use inquire::{Confirm, CustomType, InquireError};
+use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use std::fs::File;
 use std::io::{BufWriter, Error, ErrorKind, Write};
@@ -74,7 +75,7 @@ fn logo() -> &'static str {
 "#
 }
 
-fn main() -> std::io::Result<()> {
+fn main() -> miette::Result<()> {
     let mut sys = System::new_all();
 
     sys.refresh_memory();
@@ -89,23 +90,49 @@ fn main() -> std::io::Result<()> {
             .bold()
     );
 
-    let digits: usize = CustomType::<usize>::new("Enter the number of decimal places to calculate")
+    // 桁数入力ダイアログ
+    let digits_result = CustomType::<usize>::new("Enter the number of decimal places to calculate")
         .with_default(1_048_576)
-        .with_help_message("Please specify the number of decimal places as an unsigned integer!")
-        .with_error_message("Invalid value")
-        .prompt()
-        .map_err(|_| Error::new(ErrorKind::Interrupted, "Cancelled"))?;
+        .prompt();
 
-    let message = format!("Calculate {} digits of Pi. Is this OK?", digits)
-        .cyan()
-        .to_string();
-    if !Confirm::new(&message)
-        .with_default(true)
-        .prompt()
-        .map_err(|_| Error::new(ErrorKind::Interrupted, "Aborted"))?
-    {
-        println!("{}", "The request was aborted".bright_black());
-        return Ok(());
+    let digits = match digits_result {
+        Ok(val) => val,
+        Err(InquireError::OperationCanceled) | Err(InquireError::OperationInterrupted) => {
+            // Ctrl+C や Esc でのキャンセル時
+            println!("\n{}", "Cancelled".bright_black().italic());
+            return Ok(()); // 正常終了として扱うのがプロの嗜みらしい
+        }
+        Err(err) => return Err(miette::miette!(err)), // それ以外のの異常はmietteに任せる
+    };
+
+    // 実行確認ダイアログ
+    let confirm_result = Confirm::new(
+        &format!("Calculate {} digits of Pi. Is this OK?", digits)
+            .cyan()
+            .to_string(),
+    )
+    .with_default(true)
+    .prompt();
+
+    match confirm_result {
+        Ok(true) => {
+            // はいを選んだので続行
+        }
+        Ok(false) => {
+            // いいえを選んだ場合は中断
+            println!("{}", "The system was aborted".bright_black());
+            return Ok(());
+        }
+        Err(inquire::InquireError::OperationCanceled)
+        | Err(inquire::InquireError::OperationInterrupted) => {
+            // Ctrl+C や Esc で中断された場合
+            println!("\n{}", "Operation Interrupted".bright_black().italic());
+            return Ok(());
+        }
+        Err(err) => {
+            // それ以外の予期せぬエラーは miette で
+            return Err(miette::miette!(err));
+        }
     }
 
     let filename = "pi.txt";
@@ -179,9 +206,9 @@ fn main() -> std::io::Result<()> {
 
     // ファイルに保存
     let start_io = Instant::now();
-    let file = File::create(filename)?;
+    let file = File::create(filename).into_diagnostic()?;
     let mut writer = BufWriter::new(file);
-    write!(writer, "{}", pi_str)?;
+    write!(writer, "{}", pi_str).into_diagnostic()?;
     let io_time = start_io.elapsed();
     eprintln!("✓ File writing completed: {:.3}s", io_time.as_secs_f64());
 
