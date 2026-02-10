@@ -1,4 +1,5 @@
 use crate::chudnovsky::{calc_chudnovsky, ChudnovskyProgress};
+use crate::error::Result;
 use crate::gauss_legendre::{calc_gauss_legendre, GaussLegendreProgress};
 use crate::simmer::{finish_shimmer, start_shimmer};
 use dashu::float::{FBig, round::mode::HalfEven};
@@ -24,14 +25,14 @@ impl Algorithm {
         }
     }
 
-    pub fn execute(&self, digits: usize, precision: usize) -> (BinFloat, Duration) {
+    pub fn execute(&self, digits: usize, precision: usize) -> Result<(BinFloat, Duration)> {
         match self {
             Algorithm::Chudnovsky => self.run_chudnovsky(digits, precision),
             Algorithm::GaussLegendre => self.run_gauss_legendre(precision),
         }
     }
 
-    fn run_chudnovsky(&self, digits: usize, precision: usize) -> (BinFloat, Duration) {
+    fn run_chudnovsky(&self, digits: usize, precision: usize) -> Result<(BinFloat, Duration)> {
         eprintln!("Calculation method: {}", self.name().cyan());
         let shimmer = start_shimmer("Initializing...".to_string());
 
@@ -53,15 +54,25 @@ impl Algorithm {
             }
         });
 
+        // エラーが発生した場合でもシマーを停止させるために、結果を一度変数に受ける
+        let (pi, duration) = match result {
+            Ok(res) => res,
+            Err(e) => {
+                // シマー停止のためのダミー drop
+                drop(shimmer);
+                return Err(e);
+            }
+        };
+
         finish_shimmer(
             shimmer,
-            format!("Calculated: {:.3}s", result.1.as_secs_f64()),
+            format!("Calculated: {:.3}s", duration.as_secs_f64()),
         );
 
-        result
+        Ok((pi, duration))
     }
 
-    fn run_gauss_legendre(&self, precision: usize) -> (BinFloat, Duration) {
+    fn run_gauss_legendre(&self, precision: usize) -> Result<(BinFloat, Duration)> {
         eprintln!("Calculation method: {}", self.name().cyan());
         let shimmer = start_shimmer("Calculating Pi using Gauss-Legendre...".to_string());
 
@@ -75,11 +86,20 @@ impl Algorithm {
             }
         });
 
+        let (pi, duration) = match result {
+            Ok(res) => res,
+            Err(e) => {
+                drop(shimmer);
+                return Err(e);
+            }
+        };
+
         finish_shimmer(
             shimmer,
-            format!("Calculated: {:.3}s", result.1.as_secs_f64()),
+            format!("Calculated: {:.3}s", duration.as_secs_f64()),
         );
 
-        result
+        Ok((pi, duration))
     }
 }
+

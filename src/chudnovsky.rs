@@ -10,8 +10,6 @@ type BinFloat = FBig<HalfEven, 2>;
 /// Chudnovsky法の進捗状況を保持する構造体
 #[derive(Debug, Clone)]
 pub struct ChudnovskyProgress {
-    /// 計算開始からの経過時間
-    pub elapsed: Duration,
     /// 推定確定桁数
     pub estimated_digits: usize,
     /// 現在処理中の k 範囲 [a, b)
@@ -33,7 +31,6 @@ struct ProgressCollector<'a, F>
 where
     F: FnMut(ChudnovskyProgress),
 {
-    start: Instant,
     total_terms: usize,
     completed: usize,
     last_report: Instant,
@@ -48,7 +45,6 @@ where
     fn new(total_terms: usize, on_progress: &'a mut F, throttle_ms: u64) -> Self {
         let now = Instant::now();
         ProgressCollector {
-            start: now,
             total_terms,
             completed: 0,
             last_report: now,
@@ -70,7 +66,6 @@ where
         if should_report {
             self.last_report = now;
             let progress = ChudnovskyProgress {
-                elapsed: now.duration_since(self.start),
                 estimated_digits: self.completed * 14, // Chudnovsky法は1項あたり約14桁進む
                 range,
                 message: None,
@@ -81,9 +76,7 @@ where
 
     /// 最終的な完了報告を行う
     fn final_report(&mut self) {
-        let now = Instant::now();
         let progress = ChudnovskyProgress {
-            elapsed: now.duration_since(self.start),
             estimated_digits: self.completed * 14,
             range: (Some(0), Some(self.total_terms as i64)),
             message: Some("done".to_string()),
@@ -170,7 +163,7 @@ pub fn calc_chudnovsky<F>(
     digits: usize,
     precision: usize,
     mut on_progress: F,
-) -> (BinFloat, Duration)
+) -> crate::error::Result<(BinFloat, Duration)>
 where
     F: FnMut(ChudnovskyProgress),
 {
@@ -178,7 +171,6 @@ where
 
     // 初期化フェーズの通知
     on_progress(ChudnovskyProgress {
-        elapsed: start.elapsed(),
         estimated_digits: 0,
         range: (None, None),
         message: Some("Initializing...".to_string()),
@@ -209,7 +201,7 @@ where
         }
         collector.final_report();
 
-        handle.join().expect("worker thread panicked")
+        handle.join().map_err(|_| crate::error::HyperPiError::ThreadPanic)?
     };
 
     // 計算結果の結合と定数を用いた最終計算
@@ -233,13 +225,12 @@ where
 
     // 完了通知
     on_progress(ChudnovskyProgress {
-        elapsed: start.elapsed(),
         estimated_digits: n * 14,
         range: (Some(0), Some(n as i64)),
         message: Some("Completed".to_string()),
     });
 
-    (pi, start.elapsed())
+    Ok((pi, start.elapsed()))
 }
 
 #[cfg(test)]
@@ -270,7 +261,7 @@ mod tests {
         let digits = 10;
         let precision = 128;
 
-        let (pi, _duration) = calc_chudnovsky(digits, precision, |_| {});
+        let (pi, _duration) = calc_chudnovsky(digits, precision, |_| {}).unwrap();
 
         let three = BinFloat::from(3i32);
         let four = BinFloat::from(4i32);
@@ -283,7 +274,7 @@ mod tests {
         let digits = 50;
         let precision = 256;
 
-        let (pi, _duration) = calc_chudnovsky(digits, precision, |_| {});
+        let (pi, _duration) = calc_chudnovsky(digits, precision, |_| {}).unwrap();
 
         let lower = (BinFloat::from(314i32) / BinFloat::from(100i32))
             .with_precision(precision)
@@ -301,7 +292,7 @@ mod tests {
 
         for digits in test_cases {
             let precision = digits * 4;
-            let (pi, _duration) = calc_chudnovsky(digits, precision, |_| {});
+            let (pi, _duration) = calc_chudnovsky(digits, precision, |_| {}).unwrap();
 
             let three = BinFloat::from(3i32);
             let three_point_two = (BinFloat::from(32i32) / BinFloat::from(10i32))
@@ -322,7 +313,7 @@ mod tests {
             if let Some(ref msg) = progress.message {
                 messages_seen.push(msg.clone());
             }
-        });
+        }).unwrap();
 
         // 初期化と完了のメッセージが含まれていることを確認
         assert!(messages_seen.contains(&"Initializing...".to_string()));

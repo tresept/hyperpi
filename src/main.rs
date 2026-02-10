@@ -1,14 +1,8 @@
-use miette::{IntoDiagnostic, Result};
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::path::Path;
-use std::time::Instant;
-use sysinfo::System;
-
 mod algorithm;
 mod chudnovsky;
 mod cli;
 mod convert;
+mod error;
 mod gauss_legendre;
 mod simmer;
 mod utils;
@@ -16,13 +10,25 @@ mod utils;
 use algorithm::Algorithm;
 use cli::{confirm_calculation, print_stats, print_welcome, prompt_algorithm, prompt_digits, Stats};
 use convert::convert_to_decimal_string;
+use error::{HyperPiError, Result};
 use simmer::{finish_shimmer, start_shimmer};
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::Path;
+use std::time::Instant;
+use sysinfo::System;
 use utils::calculate_sha256;
 
 const FILENAME: &str = "pi.txt";
 const PRECISION_OFFSET: f64 = 128.0;
 
-fn main() -> Result<()> {
+fn main() -> miette::Result<()> {
+    // 内部的な Result から miette::Result への変換は自動で行われる
+    run().map_err(|e| miette::Report::new(e))?;
+    Ok(())
+}
+
+fn run() -> Result<()> {
     // システム情報の初期化（将来的な利用のため）
     let mut sys = System::new_all();
     sys.refresh_memory();
@@ -41,7 +47,7 @@ fn main() -> Result<()> {
     eprintln!("Now, calculate {} digits of Pi\n", digits);
 
     // 1. 円周率の計算 (バイナリ)
-    let (pi_bin, calc_time) = algorithm.execute(digits, precision);
+    let (pi_bin, calc_time) = algorithm.execute(digits, precision)?;
     eprintln!();
 
     // 2. 10進数文字列への変換
@@ -85,9 +91,18 @@ fn calculate_precision(digits: usize) -> usize {
 
 /// 結果をファイルに保存する
 fn save_to_file(filename: &str, content: &str) -> Result<()> {
-    let file = File::create(filename).into_diagnostic()?;
+    let file = File::create(filename).map_err(|e| HyperPiError::FileWriteError {
+        path: Path::new(filename).to_path_buf(),
+        source: e,
+    })?;
     let mut writer = BufWriter::new(file);
-    write!(writer, "{}", content).into_diagnostic()?;
-    writer.flush().into_diagnostic()?;
+    write!(writer, "{}", content).map_err(|e| HyperPiError::FileWriteError {
+        path: Path::new(filename).to_path_buf(),
+        source: e,
+    })?;
+    writer.flush().map_err(|e| HyperPiError::FileWriteError {
+        path: Path::new(filename).to_path_buf(),
+        source: e,
+    })?;
     Ok(())
 }

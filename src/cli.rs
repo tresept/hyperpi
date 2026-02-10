@@ -1,3 +1,4 @@
+use crate::error::{HyperPiError, Result};
 use colorgrad::Gradient;
 use inquire::{Confirm, CustomType, InquireError, Select};
 use owo_colors::OwoColorize;
@@ -74,7 +75,7 @@ pub fn print_welcome(version: &str) {
 }
 
 /// 桁数の入力を促す
-pub fn prompt_digits() -> miette::Result<Option<usize>> {
+pub fn prompt_digits() -> Result<Option<usize>> {
     let result = CustomType::<usize>::new(
         &"Enter the number of decimal places to calculate"
             .truecolor(255, 246, 129)
@@ -89,12 +90,12 @@ pub fn prompt_digits() -> miette::Result<Option<usize>> {
             eprintln!("\n{}", "Cancelled".bright_black().italic());
             Ok(None)
         }
-        Err(err) => Err(miette::miette!(err)),
+        Err(err) => Err(HyperPiError::InputError(err.to_string())),
     }
 }
 
 /// アルゴリズムの選択を促す
-pub fn prompt_algorithm<T: IntoEnumIterator + std::fmt::Display + PartialEq>() -> miette::Result<Option<T>> {
+pub fn prompt_algorithm<T: IntoEnumIterator + std::fmt::Display + PartialEq>() -> Result<Option<T>> {
     let prompt_msg = "Select the algorithm to calculate Pi"
         .truecolor(135, 206, 250)
         .to_string();
@@ -110,12 +111,12 @@ pub fn prompt_algorithm<T: IntoEnumIterator + std::fmt::Display + PartialEq>() -
             eprintln!("\n{}", "Cancelled".bright_black().italic());
             Ok(None)
         }
-        Err(err) => Err(miette::miette!(err)),
+        Err(err) => Err(HyperPiError::InputError(err.to_string())),
     }
 }
 
 /// 最終確認を促す
-pub fn confirm_calculation(digits: usize) -> miette::Result<bool> {
+pub fn confirm_calculation(digits: usize) -> Result<bool> {
     let result = Confirm::new(
         &format!("Calculate {} digits of Pi. Are you serious???", digits)
             .truecolor(220, 79, 109)
@@ -134,9 +135,10 @@ pub fn confirm_calculation(digits: usize) -> miette::Result<bool> {
             println!("\n{}", "Operation Interrupted".bright_black().italic());
             Ok(false)
         }
-        Err(err) => Err(miette::miette!(err)),
+        Err(err) => Err(HyperPiError::InputError(err.to_string())),
     }
 }
+
 
 /// 計算結果の統計情報を表示する
 pub struct Stats {

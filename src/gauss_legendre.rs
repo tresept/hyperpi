@@ -12,8 +12,6 @@ pub struct GaussLegendreProgress {
     pub iteration: u32,
     /// 総反復回数
     pub total_iterations: u32,
-    /// 計算開始からの経過時間
-    pub elapsed: Duration,
     /// 現在のフェーズ（"初期化", "計算中", "完了"など）
     pub phase: &'static str,
 }
@@ -22,7 +20,7 @@ pub struct GaussLegendreProgress {
 ///
 /// アルゴリズム: https://ja.wikipedia.org/wiki/ガウス＝ルジャンドルのアルゴリズム
 /// 参考: https://qiita.com/matsuda_tkm/items/418588d3c59cc8d85ec7
-pub fn calc_gauss_legendre<F>(precision: usize, mut on_progress: F) -> (BinFloat, Duration)
+pub fn calc_gauss_legendre<F>(precision: usize, mut on_progress: F) -> crate::error::Result<(BinFloat, Duration)>
 where
     F: FnMut(GaussLegendreProgress),
 {
@@ -34,7 +32,6 @@ where
     on_progress(GaussLegendreProgress {
         iteration: 0,
         total_iterations: iterations,
-        elapsed: start.elapsed(),
         phase: "Initializing...",
     });
 
@@ -51,7 +48,6 @@ where
     on_progress(GaussLegendreProgress {
         iteration: 0,
         total_iterations: iterations,
-        elapsed: start.elapsed(),
         phase: "Calculating...",
     });
 
@@ -69,7 +65,6 @@ where
         on_progress(GaussLegendreProgress {
             iteration: i + 1,
             total_iterations: iterations,
-            elapsed: start.elapsed(),
             phase: "Calculating...",
         });
     }
@@ -85,11 +80,10 @@ where
     on_progress(GaussLegendreProgress {
         iteration: iterations,
         total_iterations: iterations,
-        elapsed: start.elapsed(),
         phase: "Completed",
     });
 
-    (pi, start.elapsed())
+    Ok((pi, start.elapsed()))
 }
 
 #[cfg(test)]
@@ -100,7 +94,7 @@ mod tests {
     fn test_calc_gauss_legendre_basic() {
         // 基本的な計算のテスト
         let precision = 128;
-        let (pi, _duration) = calc_gauss_legendre(precision, |_| {});
+        let (pi, _duration) = calc_gauss_legendre(precision, |_| {}).unwrap();
 
         // πが妥当な範囲にあることを確認（3 < π < 4）
         let three = BinFloat::from(3i32);
@@ -113,7 +107,7 @@ mod tests {
     fn test_calc_gauss_legendre_precision() {
         // より高精度でπを計算
         let precision = 256;
-        let (pi, _duration) = calc_gauss_legendre(precision, |_| {});
+        let (pi, _duration) = calc_gauss_legendre(precision, |_| {}).unwrap();
 
         // πが妥当な範囲にあることを確認（3.14 < π < 3.15）
         let lower = (BinFloat::from(314i32) / BinFloat::from(100i32))
@@ -136,7 +130,7 @@ mod tests {
         let (_pi, _duration) = calc_gauss_legendre(precision, |progress| {
             callback_count += 1;
             phases_seen.push(progress.phase);
-        });
+        }).unwrap();
 
         // コールバックが複数回呼ばれていることを確認
         assert!(callback_count > 0);
@@ -157,7 +151,7 @@ mod tests {
         let (_pi, _duration) = calc_gauss_legendre(precision, |progress| {
             max_iteration = max_iteration.max(progress.iteration);
             total_iterations = progress.total_iterations;
-        });
+        }).unwrap();
 
         // イテレーション数が合理的な範囲にあることを確認
         assert!(total_iterations > 0);
@@ -167,8 +161,8 @@ mod tests {
     #[test]
     fn test_calc_gauss_legendre_convergence() {
         // 精度を上げると結果が改善されることを確認
-        let (pi_low, _) = calc_gauss_legendre(64, |_| {});
-        let (pi_high, _) = calc_gauss_legendre(256, |_| {});
+        let (pi_low, _) = calc_gauss_legendre(64, |_| {}).unwrap();
+        let (pi_high, _) = calc_gauss_legendre(256, |_| {}).unwrap();
 
         // 両方とも3と4の間にあることを確認
         let three = BinFloat::from(3i32);
@@ -185,7 +179,6 @@ mod tests {
         let progress = GaussLegendreProgress {
             iteration: 5,
             total_iterations: 10,
-            elapsed: Duration::from_secs(1),
             phase: "Calculating...",
         };
 
@@ -198,7 +191,7 @@ mod tests {
     fn test_calc_gauss_legendre_elapsed_time() {
         // 経過時間が記録されることを確認
         let precision = 128;
-        let (_, duration) = calc_gauss_legendre(precision, |_| {});
+        let (_, duration) = calc_gauss_legendre(precision, |_| {}).unwrap();
 
         // 何らかの時間が経過していることを確認
         assert!(duration.as_nanos() > 0);

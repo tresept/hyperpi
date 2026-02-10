@@ -9,7 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 /// スピナーのフレーム（Unicode Braille パターン）
-const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_FRAMES: &[&str] = &["▖", "▘", "▝", "▗", "▙", "▛", "▜", "▟", "▚", "▞"];
 
 /// シマーアニメーションの設定
 struct ShimmerConfig {
