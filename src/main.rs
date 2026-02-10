@@ -96,8 +96,8 @@ fn main() -> std::io::Result<()> {
 
     let digits: usize = CustomType::<usize>::new("計算する円周率の桁数を入力")
         .with_default(1_048_576)
-        .with_help_message("小数点以下の桁数を正の整数で入力してください")
-        .with_error_message("usizeの範囲内で正しい数値を入力してください")
+        .with_help_message("小数点以下の桁数を符号なし整数で指定してください")
+        .with_error_message("無効な値です")
         .prompt()
         .map_err(|_| Error::new(ErrorKind::Interrupted, "Cancelled"))?;
 
