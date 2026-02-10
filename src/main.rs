@@ -68,13 +68,12 @@ fn gradient_text(text: String) -> String {
         .join("\n")
 }
 
-fn logo() -> String {
+fn logo() -> &'static str {
     r#"
 ░█░█░█░█░█▀█░█▀▀░█▀▄░█▀█░▀█▀░
 ░█▀█░░█░░█▀▀░█▀▀░█▀▄░█▀▀░░█░░
 ░▀░▀░░▀░░▀░░░▀▀▀░▀░▀░▀░░░▀▀▀░
 "#
-    .to_string()
 }
 
 fn main() -> std::io::Result<()> {
@@ -84,7 +83,7 @@ fn main() -> std::io::Result<()> {
 
     const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-    eprintln!("{}", gradient_text(logo()).bold());
+    eprintln!("{}", gradient_text(logo().to_string()).bold());
     eprintln!(
         "{}",
         format!("  Welcome to HyperPi v{}\n", VERSION)
