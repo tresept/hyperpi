@@ -157,8 +157,10 @@ fn main() -> std::io::Result<()> {
             _ => {
                 // Binary Splitting の進捗（leaf_done からのコールバック）
                 spinner.set_message(format!(
-                    "Chudnovsky法: 推定 {} 桁確定",
-                    info.estimated_digits
+                    "Chudnovsky法: 推定 {} 桁確定 -> 範囲 [{}, {}) を処理中",
+                    info.estimated_digits,
+                    info.range.0.map_or(0, |v| v),
+                    info.range.1.map_or(0, |v| v),
                 ));
             }
         }

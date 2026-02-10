@@ -2,8 +2,6 @@ use dashu::base::SquareRoot;
 use dashu::float::{FBig, round::mode::HalfEven};
 use dashu::integer::IBig;
 
-use rayon::prelude::*;
-
 use std::time::{Duration, Instant};
 
 type BinFloat = FBig<HalfEven, 2>;
