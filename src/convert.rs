@@ -3,9 +3,13 @@ use dashu::integer::IBig;
 
 use std::time::{Duration, Instant};
 
+/// 内部計算に使用する2進数浮動小数点数型
 type BinFloat = FBig<HalfEven, 2>;
 
 /// 2進数表現のFBigを10進数文字列に変換する
+/// * value: 変換対象の浮動小数点数
+/// * digits: 抽出する小数部の桁数
+/// * precision: 内部計算に使用するビット精度
 pub fn convert_to_decimal_string(
     value: &BinFloat,
     digits: usize,
@@ -13,8 +17,7 @@ pub fn convert_to_decimal_string(
 ) -> (String, Duration) {
     let start = Instant::now();
 
-    // 整数部が何桁あるかを計算する
-    // 整数部だけIBigにすればいいらしい
+    // 整数部を抽出し、文字列に変換して桁数を取得する
     let integer_part = value.clone().trunc().to_int().value();
     let integer_str = integer_part.to_string();
     let int_len = integer_str.len();
@@ -25,8 +28,7 @@ pub fn convert_to_decimal_string(
         return (result, start.elapsed());
     }
 
-    // 10^digits を掛けて整数化する
-    // ほしい桁数分の整数部 + 小数点部に分ける
+    // 値を 10^digits 倍して、整数化することで必要な桁を抽出する
     let multiplier = IBig::from(10u8).pow(digits);
     let scaled_value = (value * FBig::from(multiplier).with_precision(precision).value())
         .trunc()
@@ -35,8 +37,11 @@ pub fn convert_to_decimal_string(
 
     let full_str = scaled_value.to_string();
 
-    // 整数部の桁数で分割してから、小数部から必要な桁数だけ取り出す
+    // 元の整数部の桁数で分割し、整数部と小数部を再構成する
+    // scaled_value.to_string() の結果から小数部を切り出す
     let (integer_part_str, decimal_part_full) = full_str.split_at(int_len);
+    
+    // 指定された桁数に調整（万が一多すぎる場合を考慮）
     let decimal_part = if decimal_part_full.len() > digits {
         &decimal_part_full[..digits]
     } else {

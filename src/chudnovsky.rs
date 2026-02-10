@@ -4,9 +4,10 @@ use dashu::integer::IBig;
 
 use std::time::{Duration, Instant};
 
+/// 内部計算に使用する2進数浮動小数点数型
 type BinFloat = FBig<HalfEven, 2>;
 
-/// Chudnovsky法のプログレス情報
+/// Chudnovsky法の進捗状況を保持する構造体
 #[derive(Debug, Clone)]
 pub struct ChudnovskyProgress {
     /// 計算開始からの経過時間
@@ -19,15 +20,15 @@ pub struct ChudnovskyProgress {
     pub message: Option<String>,
 }
 
-// 分割統治法でChudnovskyの各項を計算するための構造体
+/// Binary Splitting法で使用する中間項を保持する構造体
+/// Chudnovskyの公式の各項を P, Q, R に分解して計算する
 struct Pqr {
     p: IBig,
     q: IBig,
     r: IBig,
 }
 
-// ProgressCollector を借用する版（非スレッドセーフ、シングルスレッド向け）
-// main と gauss_legendre と同じ FnMut スタイルに合わせるためにこちらを使います。
+/// 進捗情報を収集し、スロットリング（頻度制限）を行いながら報告する
 struct ProgressCollector<'a, F>
 where
     F: FnMut(ChudnovskyProgress),
@@ -56,11 +57,12 @@ where
         }
     }
 
-    // 葉が完了したら呼ぶ（bs 内から呼ぶ）
+    /// 最小単位の計算（葉ノード）が完了したときに呼ばれる
     fn leaf_done(&mut self, range: (Option<i64>, Option<i64>)) {
         self.completed += 1;
         let now = Instant::now();
 
+        // 指定されたミリ秒以上経過しているか、全項完了した場合のみ報告する
         let should_report = now.duration_since(self.last_report)
             > Duration::from_millis(self.throttle_ms)
             || self.completed == self.total_terms;
@@ -69,7 +71,7 @@ where
             self.last_report = now;
             let progress = ChudnovskyProgress {
                 elapsed: now.duration_since(self.start),
-                estimated_digits: self.completed * 14,
+                estimated_digits: self.completed * 14, // Chudnovsky法は1項あたり約14桁進む
                 range,
                 message: None,
             };
@@ -77,7 +79,7 @@ where
         }
     }
 
-    // 最終報告
+    /// 最終的な完了報告を行う
     fn final_report(&mut self) {
         let now = Instant::now();
         let progress = ChudnovskyProgress {
@@ -90,14 +92,17 @@ where
     }
 }
 
-/// 分割統治法でChudnovskyの各項を計算（プログレス付き）
+/// Binary Splitting法を並列で実行し、Chudnovskyの項を計算する
+/// * a, b: 計算範囲 [a, b)
+/// * c3: 定数 C^3
+/// * sender: 進捗状況を送信するためのチャネル
 fn bs_parallel(
     a: i64,
     b: i64,
     c3: &IBig,
     sender: Option<&std::sync::mpsc::Sender<(Option<i64>, Option<i64>)>>,
 ) -> Pqr {
-    // 小区間なら直列で処理（オーバーヘッドを避ける）
+    // 基底ケース: 範囲が1の場合は直接計算する
     if b - a == 1 {
         let k = IBig::from(a);
         let a_val = IBig::from(13591409);
@@ -105,7 +110,6 @@ fn bs_parallel(
 
         if a == 0 {
             if let Some(s) = sender {
-                // 失敗しても無視（受信側がいなくても問題ない）
                 let _ = s.send((Some(a), Some(b)));
             }
             return Pqr {
@@ -115,9 +119,12 @@ fn bs_parallel(
             };
         }
 
+        // P(k) = -(6k-5)(2k-1)(6k-1)
         let p: IBig =
             (IBig::from(6) * &k - 5) * (IBig::from(2) * &k - 1) * (IBig::from(6) * &k - 1) * -1;
+        // R(k) = k^3 * C^3 / 24
         let r = k.pow(3) * c3 / 24;
+        // Q(k) = P(k) * (A + Bk)
         let q = &p * (a_val + b_val * &k);
 
         if let Some(s) = sender {
@@ -126,12 +133,13 @@ fn bs_parallel(
 
         Pqr { p, q, r }
     } else {
-        // 並列化のしきい値（環境に応じて調整）
+        // 並列化のしきい値。これより小さい範囲は逐次処理する
         if b - a < 500 {
             let m = (a + b) / 2;
             let left = bs_parallel(a, m, c3, sender);
             let right = bs_parallel(m, b, c3, sender);
 
+            // 項の結合
             return Pqr {
                 q: &left.q * &right.r + &left.p * &right.q,
                 p: &left.p * &right.p,
@@ -140,7 +148,7 @@ fn bs_parallel(
         }
 
         let m = (a + b) / 2;
-        // 左右を並列に計算
+        // 左右の範囲を rayon を用いて並列に計算する
         let (left, right) = rayon::join(
             || bs_parallel(a, m, c3, sender),
             || bs_parallel(m, b, c3, sender),
@@ -154,12 +162,10 @@ fn bs_parallel(
     }
 }
 
-// Serial `bs` removed — please use `bs_parallel(a, b, c3, sender_option)`.
-// For tests/one-thread usage, pass `None` as the sender.
-
-/// Chudnovsky法で円周率を計算
+/// Chudnovsky法を用いて円周率を高精度に計算する
 /// * digits: 求めたい10進数の桁数
-/// * precision: 内部計算に使う2進数の精度（ビット数）
+/// * precision: 内部計算に使用するビット精度
+/// * on_progress: 進捗状況を受け取るコールバック関数
 pub fn calc_chudnovsky<F>(
     digits: usize,
     precision: usize,
@@ -170,7 +176,7 @@ where
 {
     let start = Instant::now();
 
-    // 初期化フェーズを送る
+    // 初期化フェーズの通知
     on_progress(ChudnovskyProgress {
         elapsed: start.elapsed(),
         estimated_digits: 0,
@@ -178,7 +184,7 @@ where
         message: Some("初期化".to_string()),
     });
 
-    // 必要な項数
+    // 必要な項数を算出 (1項あたり約14.18桁)
     let n = digits / 14 + 1;
 
     let c = IBig::from(640320);
@@ -186,41 +192,35 @@ where
 
     // Binary Splitting（チャネル経由でプログレスを受け取りつつ並列実行）
     let res = {
-        // メインスレッドが受信してコールバックを呼ぶ方式：
-        // ワーカースレッド内で `bs_parallel` を実行し、葉完了ごとにチャネルへ送る。
         use std::sync::mpsc;
         let (sender, receiver) = mpsc::channel::<(Option<i64>, Option<i64>)>();
 
-        // bs_parallel は sender を受け取り、葉が完了するたびに送信する
         let c3_for_thread = c3.clone();
         let handle = std::thread::spawn(move || {
             let result = bs_parallel(0, n as i64, &c3_for_thread, Some(&sender));
-            // 送信者をドロップして受信側の iterator を終了させる
-            drop(sender);
+            drop(sender); // 送信側を明示的にドロップして受信ループを終わらせる
             result
         });
 
-        // メインスレッド側でチャネルを受信してコールバックを呼ぶ
+        // メインスレッドで進捗を受信してコールバックを実行
         let mut collector = ProgressCollector::new(n, &mut on_progress, 100);
         for range in receiver {
             collector.leaf_done(range);
         }
         collector.final_report();
 
-        // ワーカースレッドの結果を取得
         handle.join().expect("worker thread panicked")
     };
-    // ↑ ブロックを抜けると collector が drop され、on_progress の借用が解放される
 
-    // 高精度な浮動小数点数に変換
+    // 計算結果の結合と定数を用いた最終計算
     let sum_num_float = BinFloat::from(res.q).with_precision(precision).value();
     let sum_den_float = BinFloat::from(res.r).with_precision(precision).value();
     let c_float = BinFloat::from(c.clone()).with_precision(precision).value();
 
-    // 高精度な √C を求める
+    // √C の計算
     let c_sqrt = c_float.sqrt().with_precision(precision).value();
 
-    // Pi = (C * √C * sum_den) / (12 * sum_num)
+    // 公式: Pi = (C * √C * sum_den) / (12 * sum_num)
     let twelve = BinFloat::from(12u8).with_precision(precision).value();
     let numerator = (&c_float * &c_sqrt * &sum_den_float)
         .with_precision(precision)
@@ -231,7 +231,7 @@ where
         .with_precision(precision)
         .value();
 
-    // 完了フェーズを送る
+    // 完了通知
     on_progress(ChudnovskyProgress {
         elapsed: start.elapsed(),
         estimated_digits: n * 14,
