@@ -3,8 +3,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{Confirm, CustomType, InquireError};
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
+use sha2::{Digest, Sha256};
 use std::fs::File;
-use std::io::{BufWriter, Error, ErrorKind, Write};
+use std::io::{BufWriter, Error, ErrorKind, Write, copy};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
@@ -34,7 +36,7 @@ fn gradient_line(text: &str) -> String {
     let gradient = colorgrad::GradientBuilder::new()
         .colors(&[
             colorgrad::Color::from_rgba8(219, 79, 109, 255),
-            colorgrad::Color::from_rgba8(255, 244, 129, 255),
+            colorgrad::Color::from_rgba8(255, 246, 129, 255),
         ])
         .build::<colorgrad::LinearGradient>()
         .unwrap();
@@ -75,6 +77,19 @@ fn logo() -> &'static str {
 "#
 }
 
+fn check_hash(path: PathBuf) -> Result<String, miette::Error> {
+    let file = File::open(&path)
+        .into_diagnostic()
+        .map_err(|e| miette::miette!(format!("Failed to open file {}: {}", path.display(), e)))?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut hasher = sha2::Sha256::new();
+    copy(&mut reader, &mut hasher)
+        .into_diagnostic()
+        .map_err(|e| miette::miette!(format!("Error: {}", e)));
+    let result_hash = hasher.finalize();
+    Ok(format!("{:x}", result_hash))
+}
+
 fn main() -> miette::Result<()> {
     let mut sys = System::new_all();
 
@@ -91,9 +106,13 @@ fn main() -> miette::Result<()> {
     );
 
     // 桁数入力ダイアログ
-    let digits_result = CustomType::<usize>::new("Enter the number of decimal places to calculate")
-        .with_default(1_048_576)
-        .prompt();
+    let digits_result = CustomType::<usize>::new(
+        &"Enter the number of decimal places to calculate"
+            .truecolor(255, 246, 129)
+            .to_string(),
+    )
+    .with_default(1_048_576)
+    .prompt();
 
     let digits = match digits_result {
         Ok(val) => val,
@@ -107,8 +126,8 @@ fn main() -> miette::Result<()> {
 
     // 実行確認ダイアログ
     let confirm_result = Confirm::new(
-        &format!("Calculate {} digits of Pi. Is this OK?", digits)
-            .cyan()
+        &format!("Calculate {} digits of Pi. Are you serious???", digits)
+            .truecolor(220, 79, 109)
             .to_string(),
     )
     .with_default(true)
@@ -212,9 +231,54 @@ fn main() -> miette::Result<()> {
     let io_time = start_io.elapsed();
     eprintln!("✓ File writing completed: {:.3}s", io_time.as_secs_f64());
 
+    eprintln!("\n✨ Completed Calculation! ✨");
+    eprintln!();
+
+    // ハッシュ計算
+    let pi_hash = check_hash(PathBuf::from(filename))?;
+
+    let total_time =
+        calc_time.as_secs_f64() + conversion_time.as_secs_f64() + io_time.as_secs_f64();
+
+    let label_width = 22; // 一番長いラベルに合わせます
+
+    // {:<width$} で左寄せの幅を動的に指定できます
     eprintln!(
-        "\n✨ Completed in a total of {:.3}s ✨",
-        (calc_time.as_secs_f64() + conversion_time.as_secs_f64() + io_time.as_secs_f64())
+        "{:<width$} {}",
+        "Algorithm:".bright_black(),
+        "Chudnovsky Algorithm".cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "Total time:".bright_black(),
+        total_time.cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "Calculation time:".bright_black(),
+        calc_time.as_secs_f64().cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "Conversion time:".bright_black(),
+        conversion_time.as_secs_f64().cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {:.3} seconds",
+        "IO time:".bright_black(),
+        io_time.as_secs_f64().cyan(),
+        width = label_width
+    );
+    eprintln!(
+        "{:<width$} {}{}",
+        "Result SHA-256 hash:".bright_black(),
+        pi_hash.chars().take(16).collect::<String>().cyan(),
+        "...".cyan(),
+        width = label_width
     );
 
     Ok(())
