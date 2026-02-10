@@ -32,10 +32,8 @@ macro_rules! hex_color {
 fn gradient_line(text: &str) -> String {
     let gradient = colorgrad::GradientBuilder::new()
         .colors(&[
-            // colorgrad::Color::from_rgba8(0, 255, 255, 255), // シアン
-            // colorgrad::Color::from_rgba8(143, 250, 171, 255), // グリーン
-            colorgrad::Color::from_rgba8(250, 214, 77, 255), // イエロー
-            colorgrad::Color::from_rgba8(250, 122, 205, 255), // マゼンタ
+            colorgrad::Color::from_rgba8(219, 79, 109, 255),
+            colorgrad::Color::from_rgba8(255, 244, 129, 255),
         ])
         .build::<colorgrad::LinearGradient>()
         .unwrap();
@@ -86,22 +84,19 @@ fn main() -> std::io::Result<()> {
     eprintln!("{}", gradient_text(logo().to_string()).bold());
     eprintln!(
         "{}",
-        format!("  Welcome to HyperPi v{}\n", VERSION)
-            .color(hex_color!("#87cefa"))
+        format!("Welcome to HyperPi v{}\n", VERSION)
+            .color(hex_color!("#326095"))
             .bold()
     );
 
-    let total_memory = sys.total_memory();
-    let available_memory = sys.available_memory();
-
-    let digits: usize = CustomType::<usize>::new("計算する円周率の桁数を入力")
+    let digits: usize = CustomType::<usize>::new("Enter the number of decimal places to calculate")
         .with_default(1_048_576)
-        .with_help_message("小数点以下の桁数を符号なし整数で指定してください")
-        .with_error_message("無効な値です")
+        .with_help_message("Please specify the number of decimal places as an unsigned integer!")
+        .with_error_message("Invalid value")
         .prompt()
         .map_err(|_| Error::new(ErrorKind::Interrupted, "Cancelled"))?;
 
-    let message = format!("{} 桁の円周率を計算します．よろしいですか？", digits)
+    let message = format!("Calculate {} digits of Pi. Is this OK?", digits)
         .cyan()
         .to_string();
     if !Confirm::new(&message)
@@ -109,7 +104,7 @@ fn main() -> std::io::Result<()> {
         .prompt()
         .map_err(|_| Error::new(ErrorKind::Interrupted, "Aborted"))?
     {
-        println!("{}", "要求は中断されました".bright_black());
+        println!("{}", "The request was aborted".bright_black());
         return Ok(());
     }
 
@@ -118,7 +113,7 @@ fn main() -> std::io::Result<()> {
     // 必要なビット精度: 桁数 * log2(10) + 誤差補正
     let precision = (digits as f64 * 10.0_f64.log2() + 128.0) as usize;
 
-    eprintln!("ただいまより {} 桁の円周率を計算します\n", digits);
+    eprintln!("Now, calculate {} digits of Pi\n", digits);
 
     // 計算用スピナー
     let spinner = ProgressBar::new_spinner();
@@ -134,7 +129,7 @@ fn main() -> std::io::Result<()> {
     let (pi_bin, calc_time) = calc_chudnovsky(digits, precision, |info: ChudnovskyProgress| {
         match info.message.as_deref() {
             Some("初期化") => {
-                spinner.set_message("初期化中...");
+                spinner.set_message("Initializing...");
             }
             Some("完了") => {
                 spinner.set_style(
@@ -143,12 +138,12 @@ fn main() -> std::io::Result<()> {
                         .unwrap(),
                 );
                 spinner
-                    .finish_with_message(format!("計算完了: {:.3}s", info.elapsed.as_secs_f64()));
+                    .finish_with_message(format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()));
             }
             _ => {
                 // Binary Splitting の進捗（leaf_done からのコールバック）
                 spinner.set_message(format!(
-                    "Chudnovsky法: 推定 {} 桁確定 -> 範囲 [{}, {}) を処理中",
+                    "Chudnovsky Algorithm: Estimated {} digits confirmed -> Processing range [{}, {})",
                     info.estimated_digits,
                     info.range.0.map_or(0, |v| v),
                     info.range.1.map_or(0, |v| v),
@@ -167,7 +162,7 @@ fn main() -> std::io::Result<()> {
             .unwrap()
             .tick_chars("▖▗▘▙▚▛▜▝▞▟"),
     );
-    spinner.set_message("10進数への変換中...");
+    spinner.set_message("Converting to decimal string...");
 
     let (pi_str, conversion_time) = convert_to_decimal_string(&pi_bin, digits, precision);
 
@@ -178,7 +173,7 @@ fn main() -> std::io::Result<()> {
     );
 
     spinner.finish_with_message(format!(
-        "10進数変換完了: {:.3}s",
+        "Decimal conversion complete: {:.3}s",
         conversion_time.as_secs_f64()
     ));
 
@@ -188,10 +183,10 @@ fn main() -> std::io::Result<()> {
     let mut writer = BufWriter::new(file);
     write!(writer, "{}", pi_str)?;
     let io_time = start_io.elapsed();
-    eprintln!("✓ ファイル書き込み完了: {:.3}s", io_time.as_secs_f64());
+    eprintln!("✓ File writing completed: {:.3}s", io_time.as_secs_f64());
 
     eprintln!(
-        "\n✨ 合計 {:.3}s で完了しました ✨",
+        "\n✨ Completed in a total of {:.3}s ✨",
         (calc_time.as_secs_f64() + conversion_time.as_secs_f64() + io_time.as_secs_f64())
     );
 
