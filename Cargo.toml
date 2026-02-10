@@ -16,5 +16,6 @@ num-traits = "0.2.19"
 owo-colors = "4.2.3"
 rayon = "1.11.0"
 sha2 = "0.10.9"
+strum = { version = "0.27.2", features = ["derive"] }
 sysinfo = "0.38.1"
 thiserror = "2.0.18"

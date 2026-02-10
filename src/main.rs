@@ -1,11 +1,12 @@
-use inquire::{Confirm, CustomType, InquireError};
+use inquire::{Confirm, CustomType, InquireError, Select};
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use sha2::Digest;
 use std::fs::File;
 use std::io::{BufWriter, Write, copy};
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use strum::{Display, EnumIter, IntoEnumIterator};
 use sysinfo::System;
 
 #[allow(unused_imports)]
@@ -37,6 +38,16 @@ fn check_hash(path: PathBuf) -> Result<String, miette::Error> {
     Ok(format!("{:x}", result_hash))
 }
 
+#[derive(Debug, Display, EnumIter, PartialEq)]
+enum Algorithm {
+    #[strum(to_string = "Gauss-Legendre Algorithm")]
+    GaussLegendre,
+    #[strum(to_string = "Chudnovsky Algorithm (Recommended)")]
+    Chudnovsky,
+    // #[strum(to_string = "ボルウェインのアルゴリズム (高次収束)")]
+    // Borwein,
+}
+
 fn main() -> miette::Result<()> {
     let mut sys = System::new_all();
     sys.refresh_memory();
@@ -64,10 +75,28 @@ fn main() -> miette::Result<()> {
     let digits = match digits_result {
         Ok(val) => val,
         Err(InquireError::OperationCanceled) | Err(InquireError::OperationInterrupted) => {
-            println!("\n{}", "Cancelled".bright_black().italic());
+            eprintln!("\n{}", "Cancelled".bright_black().italic());
             return Ok(());
         }
         Err(err) => return Err(miette::miette!(err)),
+    };
+
+    // アルゴリズムの選択
+    let prompt_msg = "Select the algorithm to calculate Pi"
+        .truecolor(135, 206, 250)
+        .to_string();
+
+    let options = Algorithm::iter().collect::<Vec<_>>();
+
+    let target = match Select::new(&prompt_msg, options)
+        .with_help_message("Pick one of the algorithms to calculate Pi...")
+        .prompt()
+    {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!("\n{}", "Cancelled".bright_black().italic());
+            return Ok(());
+        }
     };
 
     // 実行の最終確認
@@ -100,31 +129,51 @@ fn main() -> miette::Result<()> {
 
     eprintln!("Now, calculate {} digits of Pi\n", digits);
 
-    // 円周率の計算（Chudnovsky法）
-    let spinner = create_spinner("Initializing...", true);
+    let algorithm_string = match target {
+        Algorithm::Chudnovsky => "Chudnovsky Algorithm",
+        Algorithm::GaussLegendre => "Gauss-Legendre Algorithm",
+    };
 
-    let (pi_bin, calc_time) = calc_chudnovsky(digits, precision, |info: ChudnovskyProgress| {
-        match info.message.as_deref() {
-            Some("初期化") => {
-                spinner.set_message("Initializing...");
-            }
-            Some("完了") => {
-                finish_spinner(
-                    &spinner,
-                    format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()),
-                );
-            }
-            _ => {
-                // Binary Splitting の進捗状況を更新
-                spinner.set_message(format!(
-                    "Chudnovsky Algorithm: Estimated {} digits confirmed -> Processing range [{}, {})",
-                    info.estimated_digits,
-                    info.range.0.map_or(0, |v| v),
-                    info.range.1.map_or(0, |v| v),
-                ));
-            }
+    let (pi_bin, calc_time) = match target {
+        Algorithm::Chudnovsky => {
+            eprintln!("Calculation method: {}", "Chudnovsky Algorithm".cyan());
+            let spinner = create_spinner("Initializing...", true);
+            // pi_bin, calc_timeを返す
+            calc_chudnovsky(digits, precision, |info: ChudnovskyProgress| {
+                match info.message.as_deref() {
+                        Some("初期化") => spinner.set_message("Initializing..."),
+                        Some("完了") => finish_spinner(
+                            &spinner,
+                            format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()),
+                        ),
+                        _ => spinner.set_message(format!(
+                            "Chudnovsky Algorithm: Estimated {} digits confirmed -> Processing range [{}, {})",
+                            info.estimated_digits,
+                            info.range.0.map_or(0, |v| v),
+                            info.range.1.map_or(0, |v| v),
+                        )),
+                    }
+            })
         }
-    });
+        Algorithm::GaussLegendre => {
+            eprintln!("Calculation method: {}", "Gauss-legendre Algorithm".cyan());
+            let spinner = create_spinner("Calculating Pi using Gauss-Legendre Algorithm...", true);
+            // pi_bin, calc_timeを返す
+            calc_gauss_legendre(precision, |info: GaussLegendreProgress| {
+                if info.iteration == info.total_iterations {
+                    finish_spinner(
+                        &spinner,
+                        format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()),
+                    );
+                } else {
+                    spinner.set_message(format!(
+                        "Gauss-Legendre Algorithm: Iteration {}/{} - {}",
+                        info.iteration, info.total_iterations, info.phase,
+                    ));
+                }
+            })
+        }
+    };
     eprintln!();
 
     // 10進数文字列への変換
@@ -169,7 +218,7 @@ fn main() -> miette::Result<()> {
     eprintln!(
         "{:<width$} {}",
         "Algorithm:".bright_black(),
-        "Chudnovsky Algorithm".cyan(),
+        algorithm_string.cyan(),
         width = label_width
     );
     eprintln!(
