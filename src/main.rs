@@ -40,10 +40,10 @@ fn check_hash(path: PathBuf) -> Result<String, miette::Error> {
 
 #[derive(Debug, Display, EnumIter, PartialEq)]
 enum Algorithm {
-    #[strum(to_string = "Gauss-Legendre Algorithm")]
-    GaussLegendre,
     #[strum(to_string = "Chudnovsky Algorithm (Recommended)")]
     Chudnovsky,
+    #[strum(to_string = "Gauss-Legendre Algorithm")]
+    GaussLegendre,
     // #[strum(to_string = "ボルウェインのアルゴリズム (高次収束)")]
     // Borwein,
 }
