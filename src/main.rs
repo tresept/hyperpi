@@ -129,7 +129,7 @@ fn main() -> std::io::Result<()> {
         (available_memory as f64 / 1024.0 / 1024.0 / 1024.0)
     );
 
-    // プログレスバー/スピナーの設定
+    // 計算用スピナー
     let spinner = ProgressBar::new_spinner();
     spinner.enable_steady_tick(Duration::from_millis(200)); // 0.2秒おきに自動更新
     spinner.set_style(
@@ -167,9 +167,29 @@ fn main() -> std::io::Result<()> {
     });
     eprintln!();
 
-    // 10進数文字列に変換（スピナーなし、時間だけ表示）
+    // 10進数変換用スピナー
+    let spinner = ProgressBar::new_spinner();
+    spinner.enable_steady_tick(Duration::from_millis(200)); // 0.2秒おきに自動更新
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} [{elapsed_precise}] {msg}")
+            .unwrap()
+            .tick_chars("▖▗▘▙▚▛▜▝▞▟"),
+    );
+    spinner.set_message("10進数への変換中...");
+
     let (pi_str, conversion_time) = convert_to_decimal_string(&pi_bin, digits, precision);
-    eprintln!("✓ 10進数変換完了: {:.3}s", conversion_time.as_secs_f64());
+
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("✓ [{elapsed_precise}] {msg}")
+            .unwrap(),
+    );
+
+    spinner.finish_with_message(format!(
+        "10進数変換完了: {:.3}s",
+        conversion_time.as_secs_f64()
+    ));
 
     // ファイルに保存
     let start_io = Instant::now();
