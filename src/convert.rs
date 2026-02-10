@@ -19,6 +19,12 @@ pub fn convert_to_decimal_string(
     let integer_str = integer_part.to_string();
     let int_len = integer_str.len();
 
+    if digits == 0 {
+        // 小数部が不要な場合は整数部のみ返す
+        let result = integer_str.to_string();
+        return (result, start.elapsed());
+    }
+
     // 10^digits を掛けて整数化する
     // ほしい桁数分の整数部 + 小数点部に分ける
     let multiplier = IBig::from(10u8).pow(digits);
