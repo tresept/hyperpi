@@ -20,7 +20,7 @@ mod convert;
 use convert::convert_to_decimal_string;
 
 mod cli;
-use cli::{gradient_text, logo, create_spinner, finish_spinner};
+use cli::{create_spinner, finish_spinner, gradient_text, logo};
 
 /// ファイルのSHA-256ハッシュを計算する
 fn check_hash(path: PathBuf) -> Result<String, miette::Error> {
@@ -29,9 +29,10 @@ fn check_hash(path: PathBuf) -> Result<String, miette::Error> {
         .map_err(|e| miette::miette!(format!("Failed to open file {}: {}", path.display(), e)))?;
     let mut reader = std::io::BufReader::new(file);
     let mut hasher = sha2::Sha256::new();
-    let _ = copy(&mut reader, &mut hasher)
+    // copy の結果は不要なので `_` にするが、エラーは伝播させる
+    copy(&mut reader, &mut hasher)
         .into_diagnostic()
-        .map_err(|e| miette::miette!(format!("Error: {}", e)));
+        .map_err(|e| miette::miette!(format!("Error while hashing {}: {}", path.display(), e)))?;
     let result_hash = hasher.finalize();
     Ok(format!("{:x}", result_hash))
 }
@@ -108,7 +109,10 @@ fn main() -> miette::Result<()> {
                 spinner.set_message("Initializing...");
             }
             Some("完了") => {
-                finish_spinner(&spinner, format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()));
+                finish_spinner(
+                    &spinner,
+                    format!("Calculated: {:.3}s", info.elapsed.as_secs_f64()),
+                );
             }
             _ => {
                 // Binary Splitting の進捗状況を更新
@@ -128,10 +132,13 @@ fn main() -> miette::Result<()> {
 
     let (pi_str, conversion_time) = convert_to_decimal_string(&pi_bin, digits, precision);
 
-    finish_spinner(&spinner, format!(
-        "Decimal conversion complete: {:.3}s",
-        conversion_time.as_secs_f64()
-    ));
+    finish_spinner(
+        &spinner,
+        format!(
+            "Decimal conversion complete: {:.3}s",
+            conversion_time.as_secs_f64()
+        ),
+    );
 
     // 結果をファイルに保存
     let start_io = Instant::now();
@@ -141,14 +148,20 @@ fn main() -> miette::Result<()> {
     let io_time = start_io.elapsed();
     eprintln!("✓ File writing completed: {:.3}s", io_time.as_secs_f64());
 
+    // ファイルのハッシュ値を計算して検証用に出力
+    // ハッシュ計測は個別で表示しないが、処理時間は全体時間に加算する
+    let start_hash = Instant::now();
+    let pi_hash = check_hash(PathBuf::from(filename))?;
+    let hash_time = start_hash.elapsed();
+
+    // ここで完了メッセージをハッシュ計算後に表示（順序を正す）
     eprintln!("\n✨ Completed Calculation! ✨");
     eprintln!();
 
-    // ファイルのハッシュ値を計算して検証用に出力
-    let pi_hash = check_hash(PathBuf::from(filename))?;
-
-    let total_time =
-        calc_time.as_secs_f64() + conversion_time.as_secs_f64() + io_time.as_secs_f64();
+    let total_time = calc_time.as_secs_f64()
+        + conversion_time.as_secs_f64()
+        + io_time.as_secs_f64()
+        + hash_time.as_secs_f64();
 
     let label_width = 22;
 
