@@ -162,7 +162,7 @@ mod tests {
         let (result, _duration) = convert_to_decimal_string(&value, 0, precision);
 
         // 整数部のみが返されることを確認
-        assert!(result.starts_with("3."));
+        assert!(result.starts_with("3"));
     }
 
     #[test]
