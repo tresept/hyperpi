@@ -1,6 +1,6 @@
-use crate::chudnovsky::{calc_chudnovsky, ChudnovskyProgress};
+use crate::chudnovsky::{ChudnovskyProgress, calc_chudnovsky};
 use crate::error::Result;
-use crate::gauss_legendre::{calc_gauss_legendre, GaussLegendreProgress};
+use crate::gauss_legendre::{GaussLegendreProgress, calc_gauss_legendre};
 use crate::simmer::{finish_shimmer, start_shimmer};
 use dashu::float::{FBig, round::mode::HalfEven};
 use owo_colors::OwoColorize;
@@ -27,16 +27,16 @@ impl Algorithm {
 
     pub fn execute(&self, digits: usize, precision: usize) -> Result<(BinFloat, Duration)> {
         match self {
-            Algorithm::Chudnovsky => self.run_chudnovsky(digits, precision),
+            Algorithm::Chudnovsky => self.run_chudnovsky(digits),
             Algorithm::GaussLegendre => self.run_gauss_legendre(precision),
         }
     }
 
-    fn run_chudnovsky(&self, digits: usize, precision: usize) -> Result<(BinFloat, Duration)> {
+    fn run_chudnovsky(&self, digits: usize) -> Result<(BinFloat, Duration)> {
         eprintln!("Calculation method: {}", self.name().cyan());
         let shimmer = start_shimmer("Initializing...".to_string());
 
-        let result = calc_chudnovsky(digits, precision, |info: ChudnovskyProgress| {
+        let result = calc_chudnovsky(digits, |info: ChudnovskyProgress| {
             match info.message.as_deref() {
                 Some("Initializing...") | Some("初期化") => {
                     shimmer.send("Initializing...".to_string()).ok();
@@ -44,10 +44,8 @@ impl Algorithm {
                 Some("Completed") | Some("完了") => {}
                 _ => {
                     let msg = format!(
-                        "Chudnovsky: {} digits → range [{}, {})",
-                        info.estimated_digits,
-                        info.range.0.unwrap_or(0),
-                        info.range.1.unwrap_or(0),
+                        "Chudnovsky: {} digits [0, {})",
+                        info.estimated_digits, info.range.1
                     );
                     shimmer.send(msg).ok();
                 }
@@ -102,4 +100,3 @@ impl Algorithm {
         Ok((pi, duration))
     }
 }
-
