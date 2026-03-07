@@ -46,7 +46,7 @@ pub fn convert_to_decimal_string(
     // 文字列長が digits より大きくなる (例: digits=2, s="100")
     let decimal_str = if s.len() > digits {
         // 桁代わりが発生したため、整数部をインクリメント
-        integer_part_int = integer_part_int + 1;
+        integer_part_int += 1;
         // 小数部は先頭の '1' を除いた部分 (つまり "00...0")
         // s が "100" なら "00"
         if digits > 0 {

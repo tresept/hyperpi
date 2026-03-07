@@ -1,78 +1,8 @@
 use crate::error::{HyperPiError, Result};
-use colorgrad::Gradient;
 use inquire::{Confirm, CustomType, InquireError, Select};
 use owo_colors::OwoColorize;
 use std::time::Duration;
 use strum::IntoEnumIterator;
-
-#[macro_export]
-macro_rules! hex_color {
-    ($hex:expr) => {{
-        let h = $hex.trim_start_matches('#');
-        owo_colors::Rgb(
-            u8::from_str_radix(&h[0..2], 16).unwrap(),
-            u8::from_str_radix(&h[2..4], 16).unwrap(),
-            u8::from_str_radix(&h[4..6], 16).unwrap(),
-        )
-    }};
-}
-
-/// 1行のテキストにグラデーションを適用する
-pub fn gradient_line(text: &str) -> String {
-    let gradient = colorgrad::GradientBuilder::new()
-        .colors(&[
-            colorgrad::Color::from_rgba8(219, 79, 109, 255),
-            colorgrad::Color::from_rgba8(255, 246, 129, 255),
-        ])
-        .build::<colorgrad::LinearGradient>()
-        .unwrap();
-
-    let len = text.chars().count();
-    if len == 0 {
-        return String::new();
-    }
-
-    text.chars()
-        .enumerate()
-        .map(|(i, c)| {
-            let t = if len == 1 {
-                0.5
-            } else {
-                i as f32 / (len - 1) as f32
-            };
-            let color = gradient.at(t).to_rgba8();
-            format!("{}", c.to_string().truecolor(color[0], color[1], color[2]))
-        })
-        .collect()
-}
-
-/// 複数行のテキストに行ごとにグラデーション適用する
-pub fn gradient_text(text: String) -> String {
-    text.lines()
-        .map(gradient_line)
-        .collect::<Vec<String>>()
-        .join("\n")
-}
-
-/// アプリケーションのロゴを返す
-pub fn logo() -> &'static str {
-    r#"
-░█░█░█░█░█▀█░█▀▀░█▀▄░█▀█░▀█▀░
-░█▀█░░█░░█▀▀░█▀▀░█▀▄░█▀▀░░█░░
-░▀░▀░░▀░░▀░░░▀▀▀░▀░▀░▀░░░▀▀▀░
-"#
-}
-
-/// ウェルカムメッセージを表示する
-pub fn print_welcome(version: &str) {
-    eprintln!("{}", gradient_text(logo().to_string()).bold());
-    eprintln!(
-        "{}",
-        format!("Welcome to HyperPi v{}\n", version)
-            .color(crate::hex_color!("#326095"))
-            .bold()
-    );
-}
 
 /// 桁数の入力を促す
 pub fn prompt_digits() -> Result<Option<usize>> {

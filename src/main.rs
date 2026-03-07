@@ -8,11 +8,11 @@ mod simmer;
 mod utils;
 
 use algorithm::Algorithm;
-use cli::{
-    Stats, confirm_calculation, print_stats, print_welcome, prompt_algorithm, prompt_digits,
-};
+use cli::{Stats, confirm_calculation, print_stats, prompt_algorithm, prompt_digits};
+use colorgrad::Gradient;
 use convert::convert_to_decimal_string;
 use error::{HyperPiError, Result};
+use owo_colors::OwoColorize;
 use simmer::{finish_shimmer, start_shimmer};
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -21,12 +21,23 @@ use std::time::Instant;
 use sysinfo::System;
 use utils::calculate_sha256;
 
+macro_rules! hex_color {
+    ($hex:expr) => {{
+        let h = $hex.trim_start_matches('#');
+        owo_colors::Rgb(
+            u8::from_str_radix(&h[0..2], 16).unwrap(),
+            u8::from_str_radix(&h[2..4], 16).unwrap(),
+            u8::from_str_radix(&h[4..6], 16).unwrap(),
+        )
+    }};
+}
+
 const FILENAME: &str = "pi.txt";
 const PRECISION_OFFSET: f64 = 128.0;
 
 fn main() -> miette::Result<()> {
     // 内部的な Result から miette::Result への変換は自動で行われる
-    run().map_err(|e| miette::Report::new(e))?;
+    run().map_err(miette::Report::new)?;
     Ok(())
 }
 
@@ -92,6 +103,63 @@ fn run() -> Result<()> {
     });
 
     Ok(())
+}
+
+/// ウェルカムメッセージを表示する
+fn print_welcome(version: &str) {
+    eprintln!("{}", gradient_text(logo().to_string()).bold());
+    eprintln!(
+        "{}",
+        format!("Welcome to HyperPi v{}\n", version)
+            .color(hex_color!("#326095"))
+            .bold()
+    );
+}
+
+/// アプリケーションのロゴを返す
+fn logo() -> &'static str {
+    r#"
+░█░█░█░█░█▀█░█▀▀░█▀▄░█▀█░▀█▀░
+░█▀█░░█░░█▀▀░█▀▀░█▀▄░█▀▀░░█░░
+░▀░▀░░▀░░▀░░░▀▀▀░▀░▀░▀░░░▀▀▀░
+"#
+}
+
+/// 複数行のテキストに行ごとにグラデーション適用する
+fn gradient_text(text: String) -> String {
+    text.lines()
+        .map(gradient_line)
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+/// 1行のテキストにグラデーションを適用する
+fn gradient_line(text: &str) -> String {
+    let gradient = colorgrad::GradientBuilder::new()
+        .colors(&[
+            colorgrad::Color::from_rgba8(219, 79, 109, 255),
+            colorgrad::Color::from_rgba8(255, 246, 129, 255),
+        ])
+        .build::<colorgrad::LinearGradient>()
+        .unwrap();
+
+    let len = text.chars().count();
+    if len == 0 {
+        return String::new();
+    }
+
+    text.chars()
+        .enumerate()
+        .map(|(i, c)| {
+            let t = if len == 1 {
+                0.5
+            } else {
+                i as f32 / (len - 1) as f32
+            };
+            let color = gradient.at(t).to_rgba8();
+            format!("{}", c.to_string().truecolor(color[0], color[1], color[2]))
+        })
+        .collect()
 }
 
 /// 必要なビット精度を計算する: 桁数 * log2(10) + 誤差補正

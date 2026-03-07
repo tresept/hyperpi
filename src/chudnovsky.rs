@@ -195,16 +195,16 @@ where
     let c_float = ctx.convert_int::<2>(c).value();
 
     // √C の計算
-    let c_sqrt = ctx.sqrt(&c_float.repr()).value();
+    let c_sqrt = ctx.sqrt(c_float.repr()).value();
 
     // 公式: Pi = (C * √C * Q_all) / (12 * T_all)
     let twelve = ctx.convert_int::<2>(IBig::from(12)).value();
 
-    let c_times_csqrt = ctx.mul(&c_float.repr(), &c_sqrt.repr()).value();
-    let numerator = ctx.mul(&c_times_csqrt.repr(), &sum_q.repr()).value();
-    let denominator = ctx.mul(&twelve.repr(), &sum_t.repr()).value();
+    let c_times_csqrt = ctx.mul(c_float.repr(), c_sqrt.repr()).value();
+    let numerator = ctx.mul(c_times_csqrt.repr(), sum_q.repr()).value();
+    let denominator = ctx.mul(twelve.repr(), sum_t.repr()).value();
 
-    let pi = ctx.div(&numerator.repr(), &denominator.repr()).value();
+    let pi = ctx.div(numerator.repr(), denominator.repr()).value();
 
     // 完了通知
     on_progress(ChudnovskyProgress {

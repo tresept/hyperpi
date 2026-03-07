@@ -5,7 +5,7 @@ use thiserror::Error;
 #[derive(Error, Diagnostic, Debug)]
 pub enum HyperPiError {
     #[error("Failed to open file: {path}")]
-    #[diagnostic(code(hyperpi::io::open_failed), help("Make sure the file exists and you have permission to access it."))]
+    #[diagnostic(code(hyperpi::io::open_failed))]
     FileOpenError {
         path: PathBuf,
         #[source]
@@ -27,10 +27,6 @@ pub enum HyperPiError {
         #[source]
         source: std::io::Error,
     },
-
-    #[error("Operation was cancelled by the user")]
-    #[diagnostic(code(hyperpi::cli::cancelled))]
-    OperationCancelled,
 
     #[error("Input error: {0}")]
     #[diagnostic(code(hyperpi::cli::input_error))]
