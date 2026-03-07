@@ -4,16 +4,15 @@ mod cli;
 mod convert;
 mod error;
 mod gauss_legendre;
-mod simmer;
 mod utils;
 
 use algorithm::Algorithm;
 use cli::{Stats, confirm_calculation, print_stats, prompt_algorithm, prompt_digits};
 use colorgrad::Gradient;
 use convert::convert_to_decimal_string;
+use crust::{Metric, Shimmer, ShimmerConfig};
 use error::{HyperPiError, Result};
 use owo_colors::OwoColorize;
-use simmer::{finish_shimmer, start_shimmer};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -35,13 +34,13 @@ macro_rules! hex_color {
 const FILENAME: &str = "pi.txt";
 const PRECISION_OFFSET: f64 = 128.0;
 
-fn main() -> miette::Result<()> {
-    // 内部的な Result から miette::Result への変換は自動で行われる
-    run().map_err(miette::Report::new)?;
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> miette::Result<()> {
+    run().await.map_err(miette::Report::new)?;
     Ok(())
 }
 
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     // システム情報の初期化（将来的な利用のため）
     let mut sys = System::new_all();
     sys.refresh_memory();
@@ -66,18 +65,30 @@ fn run() -> Result<()> {
     eprintln!("Now, calculate {} digits of Pi\n", digits);
 
     // 円周率の計算 (バイナリ)
-    let (pi_bin, calc_time) = algorithm.execute(digits, precision)?;
+    let (pi_bin, calc_time) = algorithm.execute(digits, precision).await?;
 
     // 10進数文字列への変換
-    let shimmer = start_shimmer("Converting to decimal string...".to_string());
-    let (pi_str, conversion_time) = convert_to_decimal_string(&pi_bin, digits, precision);
-    finish_shimmer(
-        shimmer,
-        format!(
+    let digits_metric = Metric::builder()
+        .suffix(" digits")
+        .no_arrow()
+        .build()
+        .expect("no_arrow is always valid");
+    digits_metric.set(digits as u64);
+    let config = ShimmerConfig {
+        time_display_threshold: Some(std::time::Duration::ZERO),
+        metrics: vec![digits_metric],
+        ..ShimmerConfig::default()
+    };
+    let shimmer = Shimmer::with_config("Converting to decimal...", config);
+    shimmer.complete_status(&format!("Calculated {:.1}s", calc_time.as_secs_f64()));
+    let (pi_str, conversion_time) =
+        tokio::task::block_in_place(|| convert_to_decimal_string(&pi_bin, digits, precision));
+    shimmer
+        .stop(&format!(
             "Decimal conversion complete: {:.3}s",
             conversion_time.as_secs_f64()
-        ),
-    );
+        ))
+        .await;
 
     // ファイルへの保存
     let start_io = Instant::now();
