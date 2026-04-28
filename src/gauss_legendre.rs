@@ -20,7 +20,10 @@ pub struct GaussLegendreProgress {
 ///
 /// アルゴリズム: https://ja.wikipedia.org/wiki/ガウス＝ルジャンドルのアルゴリズム
 /// 参考: https://qiita.com/matsuda_tkm/items/418588d3c59cc8d85ec7
-pub fn calc_gauss_legendre<F>(precision: usize, mut on_progress: F) -> crate::error::Result<(BinFloat, Duration)>
+pub fn calc_gauss_legendre<F>(
+    precision: usize,
+    mut on_progress: F,
+) -> crate::error::Result<(BinFloat, Duration)>
 where
     F: FnMut(GaussLegendreProgress),
 {
@@ -130,7 +133,8 @@ mod tests {
         let (_pi, _duration) = calc_gauss_legendre(precision, |progress| {
             callback_count += 1;
             phases_seen.push(progress.phase);
-        }).unwrap();
+        })
+        .unwrap();
 
         // コールバックが複数回呼ばれていることを確認
         assert!(callback_count > 0);
@@ -151,7 +155,8 @@ mod tests {
         let (_pi, _duration) = calc_gauss_legendre(precision, |progress| {
             max_iteration = max_iteration.max(progress.iteration);
             total_iterations = progress.total_iterations;
-        }).unwrap();
+        })
+        .unwrap();
 
         // イテレーション数が合理的な範囲にあることを確認
         assert!(total_iterations > 0);
