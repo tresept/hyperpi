@@ -1,7 +1,7 @@
 use crate::chudnovsky::{ChudnovskyProgress, calc_chudnovsky};
 use crate::error::Result;
 use crate::gauss_legendre::{GaussLegendreProgress, calc_gauss_legendre};
-use crust::{Metric, Shimmer, ShimmerConfig};
+use crate::simmer::{Metric, Shimmer, ShimmerConfig};
 use dashu::float::{FBig, round::mode::HalfEven};
 use owo_colors::OwoColorize;
 use std::time::Duration;

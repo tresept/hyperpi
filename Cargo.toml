@@ -8,7 +8,6 @@ edition = "2024"
 clap = { version = "4.5.57", features = ["derive"] }
 colorgrad = "0.8"
 crossterm = "0.29.0"
-crust = { path = "crates/crust" }
 dashu = "0.4.2"
 indicatif = "0.18.3"
 inquire = "0.9.3"
@@ -21,4 +20,4 @@ sha2 = "0.10.9"
 strum = { version = "0.27.2", features = ["derive"] }
 sysinfo = "0.38.1"
 thiserror = "2.0.18"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }

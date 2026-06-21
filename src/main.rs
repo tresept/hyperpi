@@ -4,15 +4,17 @@ mod cli;
 mod convert;
 mod error;
 mod gauss_legendre;
+#[allow(dead_code)]
+mod simmer;
 mod utils;
 
 use algorithm::Algorithm;
 use cli::{Stats, confirm_calculation, print_stats, prompt_algorithm, prompt_digits};
 use colorgrad::Gradient;
 use convert::convert_to_decimal_string;
-use crust::{Metric, Shimmer, ShimmerConfig};
 use error::{HyperPiError, Result};
 use owo_colors::OwoColorize;
+use simmer::{Metric, Shimmer, ShimmerConfig};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -194,4 +196,22 @@ fn save_to_file(filename: &str, content: &str) -> Result<()> {
         source: e,
     })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod simmer_integration_tests {
+    use crate::simmer::{Metric, Shimmer, ShimmerConfig};
+
+    #[test]
+    fn exposes_the_spinner_api_from_the_internal_module() {
+        let metric = Metric::builder().no_arrow().build().unwrap();
+        metric.set(1);
+
+        let config = ShimmerConfig {
+            metrics: vec![metric],
+            ..ShimmerConfig::default()
+        };
+        let _constructor: fn(&str, ShimmerConfig) -> Shimmer = Shimmer::with_config;
+        assert_eq!(config.metrics.len(), 1);
+    }
 }
